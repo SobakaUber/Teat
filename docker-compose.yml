@@ -1,0 +1,18 @@
+services:
+  dashboard:
+    build: .
+    container_name: docker-dashboard
+    restart: unless-stopped
+    ports:
+      - "8910:8910"
+    volumes:
+      # Read-only access to the Docker socket so the dashboard can list
+      # containers and read their status. Read-only is enough here.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Scheme used to build automatic http://<host>:<port> links.
+      - LINK_SCHEME=http
+    labels:
+      - "dashboard.name=Dashboard"
+      - "dashboard.icon=🛰️"
+      - "dashboard.hide=true"
