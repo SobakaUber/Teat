@@ -61,6 +61,16 @@
       button = `<span class="open-btn disabled">нет порта</span>`;
     }
 
+    // Control buttons (start/stop/restart). Disabled for the dashboard itself.
+    const running = c.status === "running";
+    const controls = c.is_self
+      ? `<div class="controls"><span class="ctl-self">это дашборд</span></div>`
+      : `<div class="controls">
+           <button class="ctl ctl-start" data-act="start" ${running ? "disabled" : ""} title="Запустить">▶</button>
+           <button class="ctl ctl-restart" data-act="restart" ${running ? "" : "disabled"} title="Перезапустить">⟳</button>
+           <button class="ctl ctl-stop" data-act="stop" ${running ? "" : "disabled"} title="Остановить">■</button>
+         </div>`;
+
     return `
       <article class="card" data-id="${escapeHtml(c.id)}">
         <div class="card-head">
@@ -69,6 +79,7 @@
             <div class="title">${escapeHtml(c.name)}</div>
             <div class="subtitle">${escapeHtml(c.image)}</div>
           </div>
+          ${controls}
         </div>
         <div class="status-row ${info.group}">
           <span class="status-dot ${info.cls}"></span>
@@ -114,6 +125,35 @@
       updated.textContent = "ошибка соединения";
     }
   }
+
+  async function doAction(id, action, btn) {
+    const card = btn.closest(".card");
+    const buttons = card.querySelectorAll(".ctl");
+    buttons.forEach((b) => (b.disabled = true));
+    btn.classList.add("busy");
+    try {
+      const res = await fetch(`/api/containers/${id}/${action}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+      errorBox.classList.add("hidden");
+    } catch (err) {
+      errorBox.textContent = `Не удалось выполнить «${action}»: ${err.message}`;
+      errorBox.classList.remove("hidden");
+    } finally {
+      btn.classList.remove("busy");
+      // Refresh shortly after so the new state is reflected.
+      setTimeout(load, 600);
+    }
+  }
+
+  // Event delegation for the per-card control buttons.
+  grid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".ctl");
+    if (!btn || btn.disabled) return;
+    const card = btn.closest(".card");
+    if (!card) return;
+    doAction(card.dataset.id, btn.dataset.act, btn);
+  });
 
   refreshBtn.addEventListener("click", () => {
     refreshBtn.classList.add("spin");

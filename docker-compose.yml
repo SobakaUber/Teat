@@ -6,9 +6,9 @@ services:
     ports:
       - "8910:8910"
     volumes:
-      # Read-only access to the Docker socket so the dashboard can list
-      # containers and read their status. Read-only is enough here.
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Read/write access to the Docker socket so the dashboard can list
+      # containers, read their status, and start/stop/restart them.
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       # Scheme used to build automatic http://<host>:<port> links.
       - LINK_SCHEME=http

@@ -84,6 +84,34 @@ def _serialize(container):
     }
 
 
+ACTIONS = {"start", "stop", "restart"}
+
+
+@app.route("/api/containers/<container_id>/<action>", methods=["POST"])
+def api_action(container_id, action):
+    if action not in ACTIONS:
+        return jsonify({"error": f"unknown action '{action}'"}), 400
+    try:
+        client = _client()
+        container = client.containers.get(container_id)
+    except docker.errors.NotFound:
+        return jsonify({"error": "container not found"}), 404
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
+
+    # Refuse to stop/restart the dashboard's own container, otherwise the
+    # request would kill the very process handling it.
+    if SELF_CONTAINER and container.id.startswith(SELF_CONTAINER) and action in {"stop", "restart"}:
+        return jsonify({"error": "нельзя управлять самим дашбордом"}), 400
+
+    try:
+        getattr(container, action)()
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"ok": True, "action": action})
+
+
 @app.route("/api/containers")
 def api_containers():
     try:
