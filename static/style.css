@@ -215,28 +215,20 @@ body {
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes fxIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* UBER wordmark with glitch reveal */
+/* UBER wordmark — clean wipe reveal with a soft glow build */
 .intro-wordmark {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(420px, 70vw);
+  width: min(400px, 72vw);
   transform: translate(-50%, -52%);
   opacity: 0;
-  filter: drop-shadow(0 0 16px rgba(255, 34, 51, 0.45));
-  animation: wmIn 0.6s steps(4) 1.5s both, wmGlitch 1.6s steps(2) 1.55s 1 both;
+  animation: wmReveal 1.0s cubic-bezier(0.16, 0.8, 0.24, 1) 1.45s both;
 }
-@keyframes wmIn {
-  0%   { opacity: 0; clip-path: inset(0 100% 0 0); }
-  25%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); }
-}
-@keyframes wmGlitch {
-  0%, 100% { transform: translate(-50%, -52%); filter: drop-shadow(0 0 16px rgba(255,34,51,0.45)); }
-  8%  { transform: translate(-52.5%, -52%) skewX(-7deg); filter: drop-shadow(4px 0 0 #1ad6ff) drop-shadow(-4px 0 0 var(--red)); }
-  16% { transform: translate(-48%, -51%) skewX(5deg); filter: drop-shadow(-3px 0 0 #1ad6ff) drop-shadow(3px 0 0 var(--red)); }
-  24% { transform: translate(-50.5%, -53%) skewX(-2deg); }
-  34% { transform: translate(-50%, -52%) skewX(0); }
+@keyframes wmReveal {
+  0%   { opacity: 0; clip-path: inset(0 100% 0 0); filter: blur(3px) drop-shadow(0 0 0 transparent); }
+  55%  { opacity: 1; filter: blur(0) drop-shadow(0 0 6px rgba(255, 34, 51, 0.3)); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0) drop-shadow(0 0 18px rgba(255, 34, 51, 0.5)); }
 }
 
 @keyframes textIn {

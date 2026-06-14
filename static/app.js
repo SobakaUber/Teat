@@ -199,71 +199,108 @@
   let audioCtx;
   let bootPlayed = false;
 
-  function scheduleBoot(ctx) {
-    const t0 = ctx.currentTime + 0.02;
-    const master = ctx.createGain();
-    master.gain.value = 0.42;
-    master.connect(ctx.destination);
-
-    const env = (g, start, peak, attack, end) => {
-      g.gain.setValueAtTime(0.0001, t0 + start);
-      g.gain.exponentialRampToValueAtTime(peak, t0 + start + attack);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + end);
-    };
-
-    // Low rumble sweep (power-up).
-    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
-    o1.type = "sine";
-    o1.frequency.setValueAtTime(48, t0);
-    o1.frequency.exponentialRampToValueAtTime(180, t0 + 1.4);
-    env(g1, 0, 0.6, 0.3, 1.8);
-    o1.connect(g1).connect(master); o1.start(t0); o1.stop(t0 + 1.9);
-
-    // Digital saw sweep up.
-    const o2 = ctx.createOscillator(), g2 = ctx.createGain(), f2 = ctx.createBiquadFilter();
-    o2.type = "sawtooth";
-    o2.frequency.setValueAtTime(120, t0 + 0.1);
-    o2.frequency.exponentialRampToValueAtTime(900, t0 + 1.25);
-    f2.type = "lowpass"; f2.frequency.value = 1400;
-    env(g2, 0.1, 0.16, 0.4, 1.35);
-    o2.connect(f2).connect(g2).connect(master); o2.start(t0 + 0.1); o2.stop(t0 + 1.4);
-
-    // Glitch blips.
-    [0.25, 0.43, 0.6, 0.82, 1.05, 1.22].forEach((bt) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = "square";
-      o.frequency.value = 280 + Math.random() * 1200;
-      g.gain.setValueAtTime(0.0001, t0 + bt);
-      g.gain.exponentialRampToValueAtTime(0.11, t0 + bt + 0.004);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + bt + 0.06);
-      o.connect(g).connect(master); o.start(t0 + bt); o.stop(t0 + bt + 0.07);
-    });
-
-    // Impact when the logo lands (~1.55s): boom + noise burst.
-    const boom = ctx.createOscillator(), bg = ctx.createGain();
-    boom.type = "sine";
-    boom.frequency.setValueAtTime(170, t0 + 1.5);
-    boom.frequency.exponentialRampToValueAtTime(42, t0 + 2.1);
-    env(bg, 1.5, 0.7, 0.06, 2.3);
-    boom.connect(bg).connect(master); boom.start(t0 + 1.5); boom.stop(t0 + 2.3);
-
-    const dur = 0.4;
+  // White-noise buffer of `dur` seconds.
+  function makeNoise(ctx, dur) {
     const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2.2);
-    }
-    const noise = ctx.createBufferSource(), ng = ctx.createGain(), nf = ctx.createBiquadFilter();
-    noise.buffer = buf; nf.type = "highpass"; nf.frequency.value = 700; ng.gain.value = 0.22;
-    noise.connect(nf).connect(ng).connect(master); noise.start(t0 + 1.5);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
 
-    // High shimmer tail.
-    const o3 = ctx.createOscillator(), g3 = ctx.createGain();
-    o3.type = "triangle";
-    o3.frequency.setValueAtTime(1700, t0 + 1.6);
-    o3.frequency.exponentialRampToValueAtTime(2600, t0 + 2.4);
-    env(g3, 1.6, 0.05, 0.2, 2.6);
-    o3.connect(g3).connect(master); o3.start(t0 + 1.6); o3.stop(t0 + 2.6);
+  // Cinematic, dark cyberpunk boot — no chiptune beeps.
+  function scheduleBoot(ctx) {
+    const t0 = ctx.currentTime + 0.03;
+    const IMPACT = 1.5; // when the logo lands
+
+    // Compressor glues everything and prevents clipping.
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -14;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, t0);
+    master.gain.linearRampToValueAtTime(0.72, t0 + 0.12);
+    master.gain.setValueAtTime(0.72, t0 + 2.7);
+    master.gain.linearRampToValueAtTime(0.0001, t0 + 3.5);
+    master.connect(comp).connect(ctx.destination);
+
+    // 1) Dark drone bed: detuned saws through a slowly opening lowpass.
+    const droneGain = ctx.createGain();
+    droneGain.gain.setValueAtTime(0.0001, t0);
+    droneGain.gain.exponentialRampToValueAtTime(0.16, t0 + 1.2);
+    droneGain.gain.exponentialRampToValueAtTime(0.05, t0 + 2.2);
+    droneGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.3);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.Q.value = 7;
+    lp.frequency.setValueAtTime(110, t0);
+    lp.frequency.linearRampToValueAtTime(460, t0 + 1.5);
+    lp.connect(droneGain).connect(master);
+    [55, 55.5, 110].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.detune.value = (i - 1) * 7;
+      o.connect(lp);
+      o.start(t0);
+      o.stop(t0 + 3.4);
+    });
+
+    // 2) Riser: noise through a lowpass sweeping upward into the impact.
+    const riser = ctx.createBufferSource();
+    riser.buffer = makeNoise(ctx, IMPACT + 0.3);
+    const rf = ctx.createBiquadFilter();
+    rf.type = "lowpass";
+    rf.Q.value = 9;
+    rf.frequency.setValueAtTime(180, t0);
+    rf.frequency.exponentialRampToValueAtTime(5200, t0 + IMPACT - 0.05);
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.0001, t0);
+    rg.gain.exponentialRampToValueAtTime(0.2, t0 + IMPACT - 0.1);
+    rg.gain.exponentialRampToValueAtTime(0.0001, t0 + IMPACT + 0.25);
+    riser.connect(rf).connect(rg).connect(master);
+    riser.start(t0);
+
+    // 3) Impact — deep sub boom.
+    const boom = ctx.createOscillator();
+    const bg = ctx.createGain();
+    boom.type = "sine";
+    boom.frequency.setValueAtTime(92, t0 + IMPACT);
+    boom.frequency.exponentialRampToValueAtTime(34, t0 + IMPACT + 0.7);
+    bg.gain.setValueAtTime(0.0001, t0 + IMPACT);
+    bg.gain.exponentialRampToValueAtTime(0.95, t0 + IMPACT + 0.05);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t0 + IMPACT + 1.1);
+    boom.connect(bg).connect(master);
+    boom.start(t0 + IMPACT);
+    boom.stop(t0 + IMPACT + 1.2);
+
+    // 3b) Impact body — short lowpassed noise punch (not harsh).
+    const hit = ctx.createBufferSource();
+    hit.buffer = makeNoise(ctx, 0.5);
+    const hf = ctx.createBiquadFilter();
+    hf.type = "lowpass";
+    hf.frequency.value = 2000;
+    const hg = ctx.createGain();
+    hg.gain.setValueAtTime(0.45, t0 + IMPACT);
+    hg.gain.exponentialRampToValueAtTime(0.0001, t0 + IMPACT + 0.35);
+    hit.connect(hf).connect(hg).connect(master);
+    hit.start(t0 + IMPACT);
+
+    // 4) Metallic tail — band-passed noise shimmer, dark and short.
+    const tail = ctx.createBufferSource();
+    tail.buffer = makeNoise(ctx, 1.3);
+    const tf = ctx.createBiquadFilter();
+    tf.type = "bandpass";
+    tf.frequency.value = 1500;
+    tf.Q.value = 1.8;
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.0001, t0 + IMPACT + 0.05);
+    tg.gain.exponentialRampToValueAtTime(0.06, t0 + IMPACT + 0.2);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t0 + IMPACT + 1.3);
+    tail.connect(tf).connect(tg).connect(master);
+    tail.start(t0 + IMPACT + 0.05);
   }
 
   function playBoot() {
