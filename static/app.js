@@ -11,15 +11,15 @@
 
   const REFRESH_MS = 5000;
 
-  // Status -> css modifier + russian label
+  // Status -> css modifier + label
   const STATUS_INFO = {
-    running: { cls: "running", group: "s-running", label: "running" },
-    restarting: { cls: "restarting", group: "s-warn", label: "restarting" },
-    paused: { cls: "paused", group: "s-warn", label: "paused" },
-    removing: { cls: "removing", group: "s-warn", label: "removing" },
-    exited: { cls: "exited", group: "s-stopped", label: "stopped" },
-    dead: { cls: "dead", group: "s-stopped", label: "dead" },
-    created: { cls: "created", group: "s-stopped", label: "created" },
+    running: { cls: "running", group: "s-running", spine: "is-running", label: "online" },
+    restarting: { cls: "restarting", group: "s-warn", spine: "is-warn", label: "restarting" },
+    paused: { cls: "paused", group: "s-warn", spine: "is-warn", label: "paused" },
+    removing: { cls: "removing", group: "s-warn", spine: "is-warn", label: "removing" },
+    exited: { cls: "exited", group: "s-stopped", spine: "is-stopped", label: "offline" },
+    dead: { cls: "dead", group: "s-stopped", spine: "is-stopped", label: "dead" },
+    created: { cls: "created", group: "s-stopped", spine: "is-stopped", label: "created" },
   };
 
   function escapeHtml(str) {
@@ -37,17 +37,17 @@
     return null;
   }
 
-  function cardHtml(c) {
-    const info = STATUS_INFO[c.status] || { cls: "exited", group: "s-stopped", label: c.status };
+  function statusInfo(c) {
+    return STATUS_INFO[c.status] || { cls: "exited", group: "s-stopped", spine: "is-stopped", label: c.status };
+  }
+
+  // Inner HTML of a card (without the <article> wrapper).
+  function cardInner(c) {
+    const info = statusInfo(c);
     const url = buildUrl(c);
+    const icon = c.icon ? escapeHtml(c.icon) : (info.cls === "running" ? "◆" : "◇");
 
-    const icon = c.icon
-      ? escapeHtml(c.icon)
-      : (info.cls === "running" ? "◆" : "◇");
-
-    const ports = (c.ports || []).map(
-      (p) => `<span class="port-chip">:${p}</span>`
-    ).join("");
+    const ports = (c.ports || []).map((p) => `<span class="port-chip">:${p}</span>`).join("");
 
     let health = "";
     if (c.health) {
@@ -61,7 +61,6 @@
       button = `<span class="open-btn disabled">нет порта</span>`;
     }
 
-    // Control buttons (start/stop/restart). Disabled for the dashboard itself.
     const running = c.status === "running";
     const controls = c.is_self
       ? `<div class="controls"><span class="ctl-self">это дашборд</span></div>`
@@ -72,53 +71,91 @@
          </div>`;
 
     return `
-      <article class="card" data-id="${escapeHtml(c.id)}">
-        <div class="card-head">
-          <div class="icon">${icon}</div>
-          <div class="title-wrap">
-            <div class="title">${escapeHtml(c.name)}</div>
-            <div class="subtitle">${escapeHtml(c.image)}</div>
-          </div>
-          ${controls}
+      <div class="card-head">
+        <div class="icon">${icon}</div>
+        <div class="title-wrap">
+          <div class="title">${escapeHtml(c.name)}</div>
+          <div class="subtitle">${escapeHtml(c.image)}</div>
         </div>
-        <div class="status-row ${info.group}">
-          <span class="status-dot ${info.cls}"></span>
-          <span>${escapeHtml(info.label)}</span>
-          ${health}
-        </div>
-        ${ports ? `<div class="ports">${ports}</div>` : ""}
-        ${button}
-      </article>`;
+        ${controls}
+      </div>
+      <div class="status-row ${info.group}">
+        <span class="status-dot ${info.cls}"></span>
+        <span>${escapeHtml(info.label)}</span>
+        ${health}
+      </div>
+      ${ports ? `<div class="ports">${ports}</div>` : ""}
+      ${button}`;
+  }
+
+  // id -> { el, hash }  — lets us touch the DOM only when data actually changed.
+  const cards = new Map();
+
+  function applySpine(el, c) {
+    const spine = statusInfo(c).spine;
+    el.classList.remove("is-running", "is-warn", "is-stopped");
+    el.classList.add(spine);
   }
 
   function render(containers) {
-    if (!containers.length) {
-      grid.innerHTML = "";
-      emptyBox.classList.remove("hidden");
-      statRunning.textContent = "0 running";
-      statTotal.textContent = "0 total";
-      return;
-    }
-    emptyBox.classList.add("hidden");
-
     const running = containers.filter((c) => c.status === "running").length;
-    statRunning.textContent = `${running} running`;
-    statTotal.textContent = `${containers.length} total`;
+    statRunning.textContent = `${running} online`;
+    statTotal.textContent = `${containers.length} units`;
+    emptyBox.classList.toggle("hidden", containers.length > 0);
 
-    grid.innerHTML = containers.map(cardHtml).join("");
+    const seen = new Set();
+
+    // Add new / update changed cards.
+    for (const c of containers) {
+      seen.add(c.id);
+      const hash = JSON.stringify(c);
+      let entry = cards.get(c.id);
+
+      if (!entry) {
+        const el = document.createElement("article");
+        el.className = "card enter";
+        el.dataset.id = c.id;
+        el.innerHTML = cardInner(c);
+        applySpine(el, c);
+        grid.appendChild(el);
+        cards.set(c.id, { el, hash });
+      } else if (entry.hash !== hash) {
+        entry.el.innerHTML = cardInner(c);
+        applySpine(entry.el, c);
+        entry.hash = hash;
+      }
+    }
+
+    // Remove cards for containers that disappeared.
+    for (const [id, entry] of cards) {
+      if (!seen.has(id)) {
+        entry.el.remove();
+        cards.delete(id);
+      }
+    }
+
+    // Reorder DOM to match the new order. appendChild moves existing nodes
+    // without re-triggering the enter animation, so there's no flicker.
+    let prev = null;
+    for (const c of containers) {
+      const entry = cards.get(c.id);
+      if (!entry) continue;
+      const expected = prev ? prev.nextSibling : grid.firstChild;
+      if (entry.el !== expected) {
+        grid.insertBefore(entry.el, expected);
+      }
+      prev = entry.el;
+    }
   }
 
   async function load() {
     try {
       const res = await fetch("/api/containers", { cache: "no-store" });
       const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
       errorBox.classList.add("hidden");
       render(data.containers || []);
-      const t = new Date().toLocaleTimeString("ru-RU");
-      updated.textContent = `обновлено ${t}`;
+      updated.textContent = `обновлено ${new Date().toLocaleTimeString("ru-RU")}`;
     } catch (err) {
       errorBox.textContent = `Ошибка получения данных от Docker: ${err.message}`;
       errorBox.classList.remove("hidden");
@@ -128,8 +165,7 @@
 
   async function doAction(id, action, btn) {
     const card = btn.closest(".card");
-    const buttons = card.querySelectorAll(".ctl");
-    buttons.forEach((b) => (b.disabled = true));
+    card.querySelectorAll(".ctl").forEach((b) => (b.disabled = true));
     btn.classList.add("busy");
     try {
       const res = await fetch(`/api/containers/${id}/${action}`, { method: "POST" });
@@ -141,12 +177,10 @@
       errorBox.classList.remove("hidden");
     } finally {
       btn.classList.remove("busy");
-      // Refresh shortly after so the new state is reflected.
       setTimeout(load, 600);
     }
   }
 
-  // Event delegation for the per-card control buttons.
   grid.addEventListener("click", (e) => {
     const btn = e.target.closest(".ctl");
     if (!btn || btn.disabled) return;
@@ -160,6 +194,23 @@
     setTimeout(() => refreshBtn.classList.remove("spin"), 450);
     load();
   });
+
+  // --- Boot intro ---------------------------------------------------
+  const intro = document.getElementById("intro");
+  if (intro) {
+    let ended = false;
+    const endIntro = () => {
+      if (ended) return;
+      ended = true;
+      intro.classList.add("intro-done");
+      setTimeout(() => intro.remove(), 650);
+    };
+    const auto = setTimeout(endIntro, 4000);
+    intro.addEventListener("click", () => {
+      clearTimeout(auto);
+      endIntro();
+    });
+  }
 
   load();
   setInterval(load, REFRESH_MS);
