@@ -278,38 +278,41 @@
     scheduleBoot(audioCtx);
   }
 
-  // --- Boot intro ---------------------------------------------------
+  // --- Tap-to-start gate + boot intro -------------------------------
+  const gate = document.getElementById("start-gate");
   const intro = document.getElementById("intro");
-  if (intro) {
-    let ended = false;
-    const endIntro = () => {
-      if (ended) return;
-      ended = true;
-      intro.classList.add("intro-done");
-      setTimeout(() => intro.remove(), 650);
-    };
-    const auto = setTimeout(endIntro, 4200);
 
-    // Try to play sound immediately; if autoplay is blocked, the first user
-    // gesture (anywhere) unlocks and plays it.
+  let ended = false;
+  const endIntro = () => {
+    if (ended || !intro) return;
+    ended = true;
+    intro.classList.add("intro-done");
+    setTimeout(() => intro.remove(), 650);
+  };
+
+  // Runs on the start tap: sound is now unlocked by the user gesture, and the
+  // intro animations begin from zero the moment we remove `pending`.
+  const startSequence = () => {
     playBoot();
-    const unlock = () => {
-      playBoot();
-      if (bootPlayed) {
-        ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
-          window.removeEventListener(ev, unlock)
-        );
-      }
-    };
-    ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
-      window.addEventListener(ev, unlock, { passive: true })
-    );
+    if (!intro) return;
+    intro.classList.remove("pending");
+    const auto = setTimeout(endIntro, 4200);
+    intro.addEventListener("click", () => { clearTimeout(auto); endIntro(); }, { once: true });
+  };
 
-    intro.addEventListener("click", () => {
-      playBoot();
-      clearTimeout(auto);
-      endIntro();
-    });
+  if (gate) {
+    let begun = false;
+    const begin = () => {
+      if (begun) return;
+      begun = true;
+      gate.classList.add("gate-out");
+      startSequence();
+      setTimeout(() => gate.remove(), 520);
+    };
+    gate.addEventListener("click", begin);
+    window.addEventListener("keydown", begin, { once: true });
+  } else {
+    startSequence();
   }
 
   load();

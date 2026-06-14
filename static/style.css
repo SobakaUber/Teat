@@ -59,6 +59,82 @@ body {
 /* ------------------------------------------------------------------ */
 /* Intro / boot animation                                              */
 /* ------------------------------------------------------------------ */
+/* Tap-to-start gate */
+.start-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: radial-gradient(70% 70% at 50% 50%, #0a0608 0%, #040304 100%);
+}
+.start-gate.gate-out { animation: gateOut 0.5s steps(2) forwards; }
+@keyframes gateOut {
+  0%   { opacity: 1; transform: translateX(0); }
+  20%  { opacity: 0.3; transform: translateX(5px); }
+  40%  { opacity: 0.85; transform: translateX(-7px); }
+  60%  { opacity: 0.15; transform: translateX(3px); }
+  100% { opacity: 0; transform: translateX(0); }
+}
+.start-inner { text-align: center; padding: 0 20px; }
+.start-mark {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--red-bright);
+  opacity: 0.8;
+  margin-bottom: 22px;
+  animation: flicker 4s infinite steps(20);
+}
+.start-title {
+  position: relative;
+  display: inline-block;
+  font-size: clamp(30px, 8vw, 64px);
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: #f3ecee;
+  text-shadow: 0 0 22px rgba(255, 34, 51, 0.5);
+  animation: titlePulse 2.4s ease-in-out infinite;
+}
+.start-title::before, .start-title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.start-title::before { color: var(--red); clip-path: inset(0 0 55% 0); animation: gTop 3s infinite steps(2); }
+.start-title::after  { color: #1ad6ff; clip-path: inset(55% 0 0 0); animation: gBot 2.6s infinite steps(2); }
+@keyframes gTop {
+  0%, 92%, 100% { transform: translate(0, 0); opacity: 0; }
+  93% { transform: translate(-4px, -2px); opacity: 0.9; }
+  96% { transform: translate(3px, 1px); opacity: 0.7; }
+}
+@keyframes gBot {
+  0%, 90%, 100% { transform: translate(0, 0); opacity: 0; }
+  91% { transform: translate(4px, 2px); opacity: 0.8; }
+  95% { transform: translate(-3px, -1px); opacity: 0.6; }
+}
+@keyframes titlePulse {
+  0%, 100% { text-shadow: 0 0 18px rgba(255, 34, 51, 0.4); }
+  50% { text-shadow: 0 0 30px rgba(255, 34, 51, 0.75); }
+}
+.start-sub {
+  margin-top: 20px;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.caret { color: var(--red); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 0.8; }
+  20%, 24%, 55% { opacity: 0.25; }
+}
+
 .intro {
   position: fixed;
   inset: 0;
@@ -69,6 +145,7 @@ body {
   cursor: pointer;
   transition: opacity 0.6s ease;
 }
+.intro.pending { display: none; }
 .intro.intro-done { opacity: 0; pointer-events: none; }
 
 .intro-stage {
@@ -507,7 +584,8 @@ main {
 @media (prefers-reduced-motion: reduce) {
   .intro-dot, .intro-frame-svg .fl, .intro-frame-svg .fb,
   .intro-frame-svg .fnode, .intro-frame-svg .ftext, .intro-wordmark,
-  .intro-skip, .card.enter, .status-dot.running::after {
+  .intro-skip, .card.enter, .status-dot.running::after,
+  .start-title, .start-title::before, .start-title::after, .start-mark {
     animation-duration: 0.01s !important;
   }
 }

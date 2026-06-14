@@ -13,8 +13,17 @@
   <div class="scanlines" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
 
-  <!-- Boot intro overlay -->
-  <div id="intro" class="intro" aria-hidden="true">
+  <!-- Tap-to-start gate -->
+  <div id="start-gate" class="start-gate">
+    <div class="start-inner">
+      <div class="start-mark">◣ UBER // SECURE TERMINAL</div>
+      <div class="start-title glitch" data-text="TAP TO START">TAP TO START</div>
+      <div class="start-sub">[ touch anywhere to initialize ]<span class="caret">_</span></div>
+    </div>
+  </div>
+
+  <!-- Boot intro overlay (paused until the gate is tapped) -->
+  <div id="intro" class="intro pending" aria-hidden="true">
     <div class="intro-stage">
       <i class="intro-dot"></i>
 
@@ -53,7 +62,7 @@
         <circle class="fnode" cx="545" cy="150" r="3.4"/>
         <!-- labels -->
         <text class="ftext est" x="558" y="62" text-anchor="end" font-size="16" letter-spacing="3">EST. 2026</text>
-        <text class="ftext jp" x="300" y="366" text-anchor="middle" font-size="22" letter-spacing="6">茨を越えて星々へ</text>
+        <text class="ftext jp" x="300" y="366" text-anchor="middle" font-size="22" letter-spacing="6">困難を越えて星々へ</text>
       </svg>
 
       <!-- UBER wordmark (Arasaka-style angular glyphs) -->
