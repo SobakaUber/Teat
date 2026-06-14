@@ -195,6 +195,89 @@
     load();
   });
 
+  // --- Boot sound (synthesized, no external assets) -----------------
+  let audioCtx;
+  let bootPlayed = false;
+
+  function scheduleBoot(ctx) {
+    const t0 = ctx.currentTime + 0.02;
+    const master = ctx.createGain();
+    master.gain.value = 0.42;
+    master.connect(ctx.destination);
+
+    const env = (g, start, peak, attack, end) => {
+      g.gain.setValueAtTime(0.0001, t0 + start);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + start + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + end);
+    };
+
+    // Low rumble sweep (power-up).
+    const o1 = ctx.createOscillator(), g1 = ctx.createGain();
+    o1.type = "sine";
+    o1.frequency.setValueAtTime(48, t0);
+    o1.frequency.exponentialRampToValueAtTime(180, t0 + 1.4);
+    env(g1, 0, 0.6, 0.3, 1.8);
+    o1.connect(g1).connect(master); o1.start(t0); o1.stop(t0 + 1.9);
+
+    // Digital saw sweep up.
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain(), f2 = ctx.createBiquadFilter();
+    o2.type = "sawtooth";
+    o2.frequency.setValueAtTime(120, t0 + 0.1);
+    o2.frequency.exponentialRampToValueAtTime(900, t0 + 1.25);
+    f2.type = "lowpass"; f2.frequency.value = 1400;
+    env(g2, 0.1, 0.16, 0.4, 1.35);
+    o2.connect(f2).connect(g2).connect(master); o2.start(t0 + 0.1); o2.stop(t0 + 1.4);
+
+    // Glitch blips.
+    [0.25, 0.43, 0.6, 0.82, 1.05, 1.22].forEach((bt) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = 280 + Math.random() * 1200;
+      g.gain.setValueAtTime(0.0001, t0 + bt);
+      g.gain.exponentialRampToValueAtTime(0.11, t0 + bt + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + bt + 0.06);
+      o.connect(g).connect(master); o.start(t0 + bt); o.stop(t0 + bt + 0.07);
+    });
+
+    // Impact when the logo lands (~1.55s): boom + noise burst.
+    const boom = ctx.createOscillator(), bg = ctx.createGain();
+    boom.type = "sine";
+    boom.frequency.setValueAtTime(170, t0 + 1.5);
+    boom.frequency.exponentialRampToValueAtTime(42, t0 + 2.1);
+    env(bg, 1.5, 0.7, 0.06, 2.3);
+    boom.connect(bg).connect(master); boom.start(t0 + 1.5); boom.stop(t0 + 2.3);
+
+    const dur = 0.4;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2.2);
+    }
+    const noise = ctx.createBufferSource(), ng = ctx.createGain(), nf = ctx.createBiquadFilter();
+    noise.buffer = buf; nf.type = "highpass"; nf.frequency.value = 700; ng.gain.value = 0.22;
+    noise.connect(nf).connect(ng).connect(master); noise.start(t0 + 1.5);
+
+    // High shimmer tail.
+    const o3 = ctx.createOscillator(), g3 = ctx.createGain();
+    o3.type = "triangle";
+    o3.frequency.setValueAtTime(1700, t0 + 1.6);
+    o3.frequency.exponentialRampToValueAtTime(2600, t0 + 2.4);
+    env(g3, 1.6, 0.05, 0.2, 2.6);
+    o3.connect(g3).connect(master); o3.start(t0 + 1.6); o3.stop(t0 + 2.6);
+  }
+
+  function playBoot() {
+    if (bootPlayed) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    // Browsers block audio until a user gesture; bail and retry on gesture.
+    if (audioCtx.state !== "running") return;
+    bootPlayed = true;
+    scheduleBoot(audioCtx);
+  }
+
   // --- Boot intro ---------------------------------------------------
   const intro = document.getElementById("intro");
   if (intro) {
@@ -205,8 +288,25 @@
       intro.classList.add("intro-done");
       setTimeout(() => intro.remove(), 650);
     };
-    const auto = setTimeout(endIntro, 4000);
+    const auto = setTimeout(endIntro, 4200);
+
+    // Try to play sound immediately; if autoplay is blocked, the first user
+    // gesture (anywhere) unlocks and plays it.
+    playBoot();
+    const unlock = () => {
+      playBoot();
+      if (bootPlayed) {
+        ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+          window.removeEventListener(ev, unlock)
+        );
+      }
+    };
+    ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+      window.addEventListener(ev, unlock, { passive: true })
+    );
+
     intro.addEventListener("click", () => {
+      playBoot();
       clearTimeout(auto);
       endIntro();
     });

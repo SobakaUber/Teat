@@ -17,13 +17,67 @@
   <div id="intro" class="intro" aria-hidden="true">
     <div class="intro-stage">
       <i class="intro-dot"></i>
-      <div class="intro-frame">
-        <span class="fx tl"></span><span class="fx tr"></span>
-        <span class="fx bl"></span><span class="fx br"></span>
-        <div class="intro-est">EST. 2026</div>
-        <div class="intro-logo glitch" data-text="UBER">UBER</div>
-        <div class="intro-jp">茨を越えて星々へ</div>
-      </div>
+
+      <!-- Broken HUD frame -->
+      <svg class="intro-frame-svg" viewBox="0 0 600 420" preserveAspectRatio="xMidYMid meet">
+        <!-- corner brackets -->
+        <path class="fb" d="M30,95 L30,40 L95,40"/>
+        <path class="fb" d="M505,40 L570,40 L570,95"/>
+        <path class="fb" d="M570,325 L570,380 L505,380"/>
+        <path class="fb" d="M95,380 L30,380 L30,325"/>
+        <!-- broken border segments -->
+        <path class="fl" d="M120,40 L290,40"/>
+        <path class="fl" d="M330,40 L480,40"/>
+        <path class="fl" d="M570,120 L570,200"/>
+        <path class="fl" d="M570,235 L570,300"/>
+        <path class="fl" d="M480,380 L320,380"/>
+        <path class="fl" d="M280,380 L120,380"/>
+        <path class="fl" d="M30,300 L30,210"/>
+        <path class="fl" d="M30,180 L30,120"/>
+        <!-- left chevron ticks -->
+        <path class="fl" d="M44,150 L60,162 L44,174"/>
+        <path class="fl" d="M44,182 L60,194 L44,206"/>
+        <path class="fl" d="M44,214 L60,226 L44,238"/>
+        <!-- top divider with arrowhead + dashes -->
+        <path class="fl" d="M70,95 L470,95"/>
+        <path class="fl" d="M470,95 L454,87"/>
+        <path class="fl" d="M470,95 L454,103"/>
+        <path class="fl" d="M482,95 L500,95"/>
+        <path class="fl" d="M508,95 L520,95"/>
+        <!-- right circuit traces -->
+        <path class="fl" d="M495,150 L545,150 L545,185 L568,185"/>
+        <path class="fl" d="M515,170 L515,250 L548,278"/>
+        <circle class="fnode" cx="568" cy="185" r="3.4"/>
+        <circle class="fnode" cx="548" cy="278" r="3.4"/>
+        <circle class="fnode" cx="495" cy="150" r="3.4"/>
+        <circle class="fnode" cx="545" cy="150" r="3.4"/>
+        <!-- labels -->
+        <text class="ftext est" x="558" y="62" text-anchor="end" font-size="16" letter-spacing="3">EST. 2026</text>
+        <text class="ftext jp" x="300" y="366" text-anchor="middle" font-size="22" letter-spacing="6">茨を越えて星々へ</text>
+      </svg>
+
+      <!-- UBER wordmark (Arasaka-style angular glyphs) -->
+      <svg class="intro-wordmark" viewBox="0 0 510 140" preserveAspectRatio="xMidYMid meet">
+        <g fill="var(--red)">
+          <!-- emblem: circle + ascending mark -->
+          <circle cx="48" cy="70" r="38" fill="none" stroke="var(--red)" stroke-width="6"/>
+          <path d="M48,44 L68,90 L48,78 L28,90 Z"/>
+          <!-- U -->
+          <path transform="translate(120,10)" d="M0,0 L22,0 L22,98 L66,98 L66,0 L88,0 L88,108 L74,120 L14,120 L0,106 Z"/>
+          <!-- B -->
+          <path transform="translate(222,10)" fill-rule="evenodd"
+                d="M0,0 L62,0 L84,22 L84,52 L70,60 L84,68 L84,98 L62,120 L0,120 Z
+                   M22,16 L60,16 L60,50 L22,50 Z
+                   M22,70 L60,70 L60,104 L22,104 Z"/>
+          <!-- E -->
+          <path transform="translate(320,10)"
+                d="M0,0 L68,0 L80,12 L80,22 L22,22 L22,49 L60,49 L60,71 L22,71 L22,98 L80,98 L80,108 L68,120 L0,120 Z"/>
+          <!-- R -->
+          <path transform="translate(414,10)" fill-rule="evenodd"
+                d="M0,0 L62,0 L84,22 L84,52 L62,72 L84,120 L58,120 L40,76 L22,76 L22,120 L0,120 Z
+                   M22,16 L60,16 L60,50 L22,50 Z"/>
+        </g>
+      </svg>
     </div>
     <div class="intro-skip">TAP TO SKIP</div>
   </div>
