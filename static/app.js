@@ -7,6 +7,7 @@
   const updated = document.getElementById("updated");
   const statRunning = document.getElementById("stat-running");
   const statTotal = document.getElementById("stat-total");
+  const subStat = document.getElementById("subStat");
   const refreshBtn = document.getElementById("refresh");
 
   const REFRESH_MS = 5000;
@@ -41,6 +42,17 @@
     return STATUS_INFO[c.status] || { cls: "exited", group: "s-stopped", spine: "is-stopped", label: c.status };
   }
 
+  // Human-readable uptime from seconds.
+  function fmtUptime(s) {
+    if (s == null) return "";
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m ${s % 60}s`;
+  }
+
   // Inner HTML of a card (without the <article> wrapper).
   function cardInner(c) {
     const info = statusInfo(c);
@@ -48,6 +60,7 @@
     const icon = c.icon ? escapeHtml(c.icon) : (info.cls === "running" ? "◆" : "◇");
 
     const ports = (c.ports || []).map((p) => `<span class="port-chip">:${p}</span>`).join("");
+    const up = fmtUptime(c.uptime);
 
     let health = "";
     if (c.health) {
@@ -71,6 +84,11 @@
          </div>`;
 
     return `
+      <div class="card-bar">
+        <span class="card-idx">${escapeHtml(c.id)}</span>
+        <span class="card-modtag">// container</span>
+        <span class="card-bardot"></span>
+      </div>
       <div class="card-head">
         <div class="icon">${icon}</div>
         <div class="title-wrap">
@@ -79,12 +97,17 @@
         </div>
         ${controls}
       </div>
-      <div class="status-row ${info.group}">
-        <span class="status-dot ${info.cls}"></span>
-        <span>${escapeHtml(info.label)}</span>
-        ${health}
+      <div class="card-rows">
+        <div class="krow">
+          <span class="k">Status</span>
+          <span class="v ${info.group}"><span class="status-dot ${info.cls}"></span>${escapeHtml(info.label)}${health}</span>
+        </div>
+        <div class="krow">
+          <span class="k">Uptime</span>
+          <span class="v uptime-v">${up || "—"}</span>
+        </div>
+        ${ports ? `<div class="krow"><span class="k">Ports</span><span class="v">${ports}</span></div>` : ""}
       </div>
-      ${ports ? `<div class="ports">${ports}</div>` : ""}
       ${button}`;
   }
 
@@ -101,6 +124,7 @@
     const running = containers.filter((c) => c.status === "running").length;
     statRunning.textContent = `${running} online`;
     statTotal.textContent = `${containers.length} units`;
+    if (subStat) subStat.textContent = `${running} ONLINE / ${containers.length} TOTAL`;
     emptyBox.classList.toggle("hidden", containers.length > 0);
 
     const seen = new Set();
@@ -479,6 +503,78 @@
   } else {
     startSequence();
   }
+
+  // --- Live clock ---------------------------------------------------
+  const clockEl = document.getElementById("clock");
+  function updateClock() {
+    if (clockEl) clockEl.textContent = new Date().toLocaleTimeString("ru-RU");
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // --- Dropdown menu + OS-style windows -----------------------------
+  const menuBtn = document.getElementById("menuBtn");
+  const menuDrop = document.getElementById("menuDrop");
+  const winLayer = document.getElementById("winLayer");
+  const winTitle = document.getElementById("winTitle");
+  const winBody = document.getElementById("winBody");
+  const winFoot = document.getElementById("winFoot");
+  const winClose = document.getElementById("winClose");
+  const winBackdrop = document.getElementById("winBackdrop");
+
+  function closeMenu() {
+    if (!menuDrop) return;
+    menuDrop.hidden = true;
+    if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+  }
+  function toggleMenu() {
+    if (!menuDrop) return;
+    const open = menuDrop.hidden;
+    menuDrop.hidden = !open;
+    if (menuBtn) menuBtn.setAttribute("aria-expanded", String(open));
+  }
+
+  // Placeholder content for each sub-menu item (to be filled in later).
+  function placeholderBody(title) {
+    return `
+      <div class="win-ph">
+        <div class="win-ph-glyph">◣</div>
+        <div class="win-ph-title">${escapeHtml(title)}</div>
+        <div class="win-ph-sub">Модуль в разработке. Здесь появится содержимое — пока это заглушка.</div>
+        <div class="win-ph-bar"></div>
+      </div>`;
+  }
+
+  function openWindow(title) {
+    if (!winLayer) return;
+    winTitle.textContent = title;
+    winBody.innerHTML = placeholderBody(title);
+    if (winFoot) winFoot.textContent = `UBER OS // ${title}`;
+    winLayer.hidden = false;
+  }
+  function closeWindow() {
+    if (winLayer) winLayer.hidden = true;
+  }
+
+  if (menuBtn) {
+    menuBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleMenu(); });
+  }
+  if (menuDrop) {
+    menuDrop.addEventListener("click", (e) => {
+      const item = e.target.closest(".menu-item");
+      if (!item) return;
+      closeMenu();
+      openWindow(item.dataset.title || item.textContent.trim());
+    });
+  }
+  document.addEventListener("click", (e) => {
+    if (menuDrop && !menuDrop.hidden && !e.target.closest(".navmenu")) closeMenu();
+  });
+  if (winClose) winClose.addEventListener("click", closeWindow);
+  if (winBackdrop) winBackdrop.addEventListener("click", closeWindow);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeWindow(); closeMenu(); }
+  });
 
   load();
   setInterval(load, REFRESH_MS);

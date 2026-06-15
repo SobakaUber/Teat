@@ -45,17 +45,39 @@
   <div id="bootflash" aria-hidden="true"></div>
 
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-glyph">◣</span>
-      <h1>UBER<span class="accent">//</span>CONTROL</h1>
+    <div class="bar-left">
+      <div class="navmenu">
+        <button id="menuBtn" class="menu-btn" aria-haspopup="true" aria-expanded="false">
+          <span class="menu-ico">▤</span> MENU
+        </button>
+        <div id="menuDrop" class="menu-drop" role="menu" hidden>
+          <button class="menu-item" role="menuitem" data-win="sysmon"  data-title="SYSTEM MONITOR">System Monitor</button>
+          <button class="menu-item" role="menuitem" data-win="network" data-title="NETWORK MAP">Network Map</button>
+          <button class="menu-item" role="menuitem" data-win="logs"    data-title="EVENT LOG">Event Log</button>
+          <button class="menu-item" role="menuitem" data-win="settings" data-title="SETTINGS">Settings</button>
+          <button class="menu-item" role="menuitem" data-win="about"   data-title="ABOUT">About</button>
+        </div>
+      </div>
+      <div class="brand">
+        <span class="brand-glyph">◣</span>
+        <h1>UBER<span class="accent">//</span>CONTROL</h1>
+      </div>
     </div>
     <div class="meta">
       <span class="stat" id="stat-running">— online</span>
       <span class="dot-sep">/</span>
       <span class="stat" id="stat-total">— units</span>
+      <span class="dot-sep">/</span>
+      <span class="stat clock" id="clock">--:--:--</span>
       <button id="refresh" class="refresh" title="Обновить">⟳</button>
     </div>
   </header>
+
+  <div class="subbar">
+    <span class="subbar-l">// ACTIVE MODULES</span>
+    <span class="subbar-line"></span>
+    <span class="subbar-r" id="subStat">SCANNING…</span>
+  </div>
 
   <main>
     <div id="error" class="error hidden"></div>
@@ -66,6 +88,23 @@
   <footer class="footer">
     <span id="updated">подключение…</span>
   </footer>
+
+  <!-- floating OS-style window (sub-menu items open here) -->
+  <div id="winLayer" class="win-layer" hidden>
+    <div class="win-backdrop" id="winBackdrop"></div>
+    <div class="win" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+      <div class="win-bar">
+        <span class="win-title"><span class="win-glyph">◣</span> <span id="winTitle">WINDOW</span></span>
+        <div class="win-ctrls">
+          <span class="win-dot"></span>
+          <span class="win-dot"></span>
+          <button class="win-close" id="winClose" title="Закрыть (Esc)">✕</button>
+        </div>
+      </div>
+      <div class="win-body" id="winBody"></div>
+      <div class="win-foot"><span id="winFoot">UBER OS // MODULE</span><span>v2.34.2</span></div>
+    </div>
+  </div>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
