@@ -419,6 +419,8 @@
       tick();
       await sleep(item.d != null ? item.d : 14 + Math.random() * 42);
     }
+    // Let the finished log (with blinking cursor) sit for a beat.
+    if (!skipReq) await sleep(1000);
     finishBoot();
   }
 
@@ -426,9 +428,12 @@
     if (finished) return;
     finished = true;
     if (bootFinal) bootFinal.classList.add("on");
-    const ctx = ensureAudio();
-    if (ctx) scheduleBoot(ctx); // cinematic boom builds into the reveal
-    setTimeout(revealDesktop, 1700);
+    // A couple of glitch ticks as UBER snaps in.
+    tick(0.14); setTimeout(() => tick(0.12), 90); setTimeout(() => tick(0.1), 200);
+    // Start the cinematic so its boom lands on the desktop reveal (~3s).
+    setTimeout(() => { const ctx = ensureAudio(); if (ctx) scheduleBoot(ctx); }, 1500);
+    // Hold the big UBER splash before revealing the dashboard.
+    setTimeout(revealDesktop, 3000);
   }
 
   function revealDesktop() {

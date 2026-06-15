@@ -218,20 +218,44 @@ body {
   transition: opacity 0.45s ease;
 }
 .boot-final.on { opacity: 1; }
-.boot-final .boot-wm { width: min(360px, 72vw); }
-.boot-wm-g path {
-  fill: var(--red);
-  fill-opacity: 0;
-  stroke: var(--red);
-  stroke-width: 1.4;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
+
+/* UBER — same monospace family as the boot log, with an RGB glitch */
+.boot-uber {
+  position: relative;
+  font: 800 clamp(56px, 16vw, 132px)/1 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  color: #ff3a46;
+  text-shadow: 0 0 20px rgba(255, 34, 51, 0.5);
+  opacity: 0;
 }
-.boot-final.on .boot-wm-g path {
-  animation: wmDraw 0.8s ease forwards, wmFill 0.45s ease 0.55s forwards;
+.boot-uber::before,
+.boot-uber::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
 }
-@keyframes wmDraw { to { stroke-dashoffset: 0; } }
-@keyframes wmFill { to { fill-opacity: 1; } }
+.boot-final.on .boot-uber { animation: uberIn 0.45s ease 0.2s both; }
+.boot-final.on .boot-uber::before { color: #1ad6ff; animation: glX 2.6s steps(2) 0.7s infinite; }
+.boot-final.on .boot-uber::after  { color: var(--red); animation: glY 2.2s steps(2) 0.9s infinite; }
+@keyframes uberIn {
+  0%   { opacity: 0; clip-path: inset(0 0 100% 0); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+@keyframes glX {
+  0%, 86%, 100% { transform: translate(0, 0); opacity: 0; clip-path: inset(0 0 58% 0); }
+  88% { transform: translate(-4px, -2px); opacity: 0.85; }
+  92% { transform: translate(3px, 1px); opacity: 0.6; }
+}
+@keyframes glY {
+  0%, 82%, 100% { transform: translate(0, 0); opacity: 0; clip-path: inset(54% 0 0 0); }
+  84% { transform: translate(4px, 2px); opacity: 0.7; }
+  90% { transform: translate(-3px, -1px); opacity: 0.5; }
+}
 .boot-ready {
   font: 13px/1 "JetBrains Mono", ui-monospace, monospace;
   letter-spacing: 6px;
@@ -609,7 +633,7 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .boot-log::after, .boot-wm-g path, .boot-final .boot-ready,
+  .boot-log::after, .boot-uber, .boot-uber::before, .boot-uber::after, .boot-final .boot-ready,
   #bootflash, body.booted .topbar, body.booted main, body.booted .footer,
   .card.enter, .status-dot.running::after,
   .start-title, .start-title::before, .start-title::after, .start-mark {
