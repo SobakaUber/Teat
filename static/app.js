@@ -303,92 +303,161 @@
     tail.start(t0 + IMPACT + 0.05);
   }
 
-  function playBoot() {
-    if (bootPlayed) return;
+  function ensureAudio() {
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
+    if (!AC) return null;
     if (!audioCtx) audioCtx = new AC();
     if (audioCtx.state === "suspended") audioCtx.resume();
-    // Browsers block audio until a user gesture; bail and retry on gesture.
-    if (audioCtx.state !== "running") return;
-    bootPlayed = true;
-    scheduleBoot(audioCtx);
+    return audioCtx.state === "running" ? audioCtx : null;
   }
 
-  // --- Tap-to-start gate + boot intro -------------------------------
+  // Short terminal "tick" played per printed boot line.
+  let lastTick = 0;
+  function tick(vol) {
+    const ctx = audioCtx;
+    if (!ctx || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    if (now - lastTick < 0.012) return; // throttle
+    lastTick = now;
+    const dur = 0.022;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 2200; f.Q.value = 1.1;
+    const g = ctx.createGain(); g.gain.value = vol || 0.09;
+    s.connect(f).connect(g).connect(ctx.destination); s.start(now);
+  }
+
+  // --- eDEX-style boot sequence -------------------------------------
   const gate = document.getElementById("start-gate");
   const intro = document.getElementById("intro");
-  const SVGNS = "http://www.w3.org/2000/svg";
+  const bootlog = document.getElementById("bootlog");
+  const bootFinal = document.getElementById("bootFinal");
+  const bootflash = document.getElementById("bootflash");
 
-  // Build the repetitive HUD decorations (hatch rows, progress cells) so the
-  // markup stays manageable. Elements fade in with staggered delays.
-  function buildHud() {
-    if (!intro) return;
+  // Boot log: each entry is {t, s, d?} or {burst:n} or {t:'blank'}.
+  const BOOT = [
+    { t: "head", s: "UBER OS 2.34.2 (brainlink)" },
+    { t: "info", s: "(c) 2026 UBER CORP — all rights reserved", d: 70 },
+    { t: "blank" },
+    { t: "info", s: "POST ... firmware rev 4.7" },
+    { t: "ok", s: "CPU0: 16 cores @ 4.20GHz online" },
+    { t: "ok", s: "Memory test ... 65536 MB OK" },
+    { t: "info", s: "Detecting storage devices" },
+    { t: "ok", s: "/dev/sda  NVMe SSD 1.0 TB" },
+    { t: "ok", s: "/dev/sdb  NVMe SSD 2.0 TB" },
+    { burst: 9 },
+    { t: "head", s: "Loading kernel" },
+    { t: "info", s: "Decompressing image .................. done" },
+    { t: "ok", s: "Mounting root filesystem (ro)" },
+    { t: "ok", s: "Remounting root filesystem (rw)" },
+    { t: "ok", s: "Started system logger" },
+    { t: "ok", s: "Started D-Bus message bus" },
+    { t: "ok", s: "Reached target Basic System" },
+    { t: "head", s: "Bringing up network" },
+    { t: "ok", s: "lo: loopback interface up" },
+    { t: "ok", s: "eth0: link up — 192.168.1.103/24" },
+    { t: "warn", s: "ntp: clock skew 0.3s — corrected" },
+    { burst: 13 },
+    { t: "head", s: "Starting container engine" },
+    { t: "ok", s: "containerd: started" },
+    { t: "ok", s: "dockerd: api v1.45 ready" },
+    { t: "info", s: "scanning local containers ..." },
+    { t: "ok", s: "service discovery complete" },
+    { t: "head", s: "Establishing brainlink" },
+    { t: "info", s: "neural handshake ... syncing buffer" },
+    { t: "warn", s: "cortex latency 12ms (nominal)" },
+    { t: "ok", s: "BRAINLINK ESTABLISHED" },
+    { burst: 8 },
+    { t: "blank" },
+    { t: "head", s: ">>> SYSTEM READY <<<", d: 120 },
+  ];
 
-    const addHatch = (groupId, y, x0, x1, baseDelay) => {
-      const g = intro.querySelector("#" + groupId);
-      if (!g) return;
-      let i = 0;
-      for (let x = x0; x <= x1; x += 16, i++) {
-        let el;
-        if (i % 7 === 3) {
-          el = document.createElementNS(SVGNS, "rect");
-          el.setAttribute("x", x); el.setAttribute("y", y - 5);
-          el.setAttribute("width", 5); el.setAttribute("height", 5);
-          el.setAttribute("fill", "var(--red)");
-        } else {
-          // alternating diagonal ticks
-          const up = i % 2 === 0;
-          el = document.createElementNS(SVGNS, "line");
-          el.setAttribute("x1", x); el.setAttribute("y1", up ? y + 6 : y - 6);
-          el.setAttribute("x2", x + 9); el.setAttribute("y2", up ? y - 6 : y + 6);
-          el.setAttribute("stroke", "var(--red)"); el.setAttribute("stroke-width", "2");
+  const HEX = "0123456789ABCDEF";
+  const rb = () => HEX[(Math.random() * 16) | 0] + HEX[(Math.random() * 16) | 0];
+  function randHex() {
+    const addr = "0x" + (0x4000 + ((Math.random() * 0xbfff) | 0)).toString(16).toUpperCase().padStart(4, "0");
+    let bytes = "";
+    for (let i = 0; i < 12; i++) bytes += rb() + " ";
+    return addr + "   " + bytes + "   " + (Math.random() < 0.85 ? "OK" : "··");
+  }
+
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  function addLine(html, cls) {
+    if (!bootlog) return;
+    const span = document.createElement("span");
+    span.className = "l " + (cls || "");
+    span.innerHTML = html;
+    bootlog.appendChild(span);
+    bootlog.scrollTop = bootlog.scrollHeight;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let skipReq = false;
+  let finished = false;
+  let revealed = false;
+
+  async function runBoot() {
+    for (const item of BOOT) {
+      if (skipReq) break;
+      if (item.burst) {
+        for (let i = 0; i < item.burst && !skipReq; i++) {
+          addLine(esc(randHex()), "dim");
+          if (i % 4 === 0) tick(0.05);
+          if (i % 2 === 0) await sleep(7);
         }
-        el.setAttribute("class", "show");
-        el.style.animationDelay = (baseDelay + i * 0.012) + "s";
-        g.appendChild(el);
+        continue;
       }
-    };
+      if (item.t === "blank") { addLine("&nbsp;"); continue; }
+      let html;
+      if (item.t === "ok") html = "<b>[  OK  ]</b> " + esc(item.s);
+      else if (item.t === "warn") html = "<b>[ WARN ]</b> " + esc(item.s);
+      else html = esc(item.s);
+      addLine(html, item.t);
+      tick();
+      await sleep(item.d != null ? item.d : 14 + Math.random() * 42);
+    }
+    finishBoot();
+  }
 
-    addHatch("hudHatchTop", 140, 100, 500, 1.0);
-    addHatch("hudHatchBot", 528, 90, 290, 1.0);
-    addHatch("hudHatchBot", 528, 310, 510, 1.0);
-    addHatch("hudHatchBot", 548, 90, 290, 1.1);
-    addHatch("hudHatchBot", 548, 310, 510, 1.1);
+  function finishBoot() {
+    if (finished) return;
+    finished = true;
+    if (bootFinal) bootFinal.classList.add("on");
+    const ctx = ensureAudio();
+    if (ctx) scheduleBoot(ctx); // cinematic boom builds into the reveal
+    setTimeout(revealDesktop, 1700);
+  }
 
-    // progress cells fill left -> right
-    const prog = intro.querySelector("#hudProgress");
-    if (prog) {
-      let i = 0;
-      for (let x = 200; x <= 398; x += 8, i++) {
-        const c = document.createElementNS(SVGNS, "rect");
-        c.setAttribute("x", x); c.setAttribute("y", 484);
-        c.setAttribute("width", 5); c.setAttribute("height", 11);
-        c.setAttribute("fill", "var(--red)");
-        c.setAttribute("class", "show");
-        c.style.animationDelay = (0.95 + i * 0.03) + "s";
-        prog.appendChild(c);
-      }
+  function revealDesktop() {
+    if (revealed) return;
+    revealed = true;
+    if (bootflash) {
+      bootflash.classList.add("flash");
+      setTimeout(() => bootflash.remove(), 600);
+    }
+    document.body.classList.add("booted");
+    if (intro) {
+      intro.classList.add("intro-done");
+      setTimeout(() => intro.remove(), 700);
     }
   }
-  buildHud();
 
-  let ended = false;
-  const endIntro = () => {
-    if (ended || !intro) return;
-    ended = true;
-    intro.classList.add("intro-done");
-    setTimeout(() => intro.remove(), 650);
-  };
+  // Tap during boot -> skip straight to the dashboard.
+  function skipBoot() {
+    skipReq = true;
+    finished = true;
+    revealDesktop();
+  }
 
-  // Runs on the start tap: sound is now unlocked by the user gesture, and the
-  // intro animations begin from zero the moment we remove `pending`.
   const startSequence = () => {
-    playBoot();
+    ensureAudio(); // unlocked by the start gesture
     if (!intro) return;
     intro.classList.remove("pending");
-    const auto = setTimeout(endIntro, 5400);
-    intro.addEventListener("click", () => { clearTimeout(auto); endIntro(); }, { once: true });
+    intro.addEventListener("click", skipBoot, { once: true });
+    runBoot();
   };
 
   if (gate) {

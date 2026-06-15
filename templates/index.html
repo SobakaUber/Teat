@@ -22,59 +22,24 @@
     </div>
   </div>
 
-  <!-- Boot intro overlay (paused until the gate is tapped) -->
-  <div id="intro" class="intro pending" aria-hidden="true">
-    <div class="intro-stage">
-      <i class="intro-dot"></i>
+  <!-- eDEX-style boot intro (paused until the gate is tapped) -->
+  <div id="intro" class="intro boot pending" aria-hidden="true">
+    <div class="boot-head">
+      <span>UBER OS 2.34.2 // BRAINLINK TERMINAL</span>
+      <span class="boot-head-r">NODE 192.168.1.103</span>
+    </div>
 
-      <!-- Full HUD boot sequence -->
-      <svg class="intro-hud" viewBox="0 0 600 640" preserveAspectRatio="xMidYMid meet">
+    <pre id="bootlog" class="boot-log"></pre>
+
+    <div class="boot-final" id="bootFinal">
+      <svg class="boot-wm" viewBox="0 0 378 130" preserveAspectRatio="xMidYMid meet">
         <defs>
           <filter id="uberGlow" x="-12%" y="-25%" width="124%" height="150%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="b"/>
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-
-        <!-- opening reticle -->
-        <g class="reticle" fill="none" stroke="var(--red)" stroke-width="2">
-          <path d="M262,260 L250,260 L250,272"/>
-          <path d="M338,260 L350,260 L350,272"/>
-          <path d="M250,328 L250,340 L262,340"/>
-          <path d="M350,328 L350,340 L338,340"/>
-          <circle cx="220" cy="236" r="3" fill="var(--red)" stroke="none"/>
-          <circle cx="380" cy="236" r="3" fill="var(--red)" stroke="none"/>
-          <circle cx="220" cy="364" r="3" fill="var(--red)" stroke="none"/>
-          <circle cx="380" cy="364" r="3" fill="var(--red)" stroke="none"/>
-          <rect x="255" y="350" width="90" height="6" rx="2" fill="var(--red)" stroke="none"/>
-        </g>
-
-        <!-- top status bar -->
-        <rect class="show d1" x="70" y="64" width="118" height="12" fill="var(--red)"/>
-        <rect class="show d1" x="412" y="64" width="118" height="12" fill="var(--red)"/>
-        <text class="flash" style="--ad:1.3s;--bd:3.3s" x="300" y="74" text-anchor="middle"
-              font-size="12" letter-spacing="2">BRAINLINK ESTABLISHED</text>
-
-        <!-- header row -->
-        <rect class="show d3" x="90" y="110" width="6" height="6" fill="var(--red)"/>
-        <rect class="show d3" x="504" y="110" width="6" height="6" fill="var(--red)"/>
-        <text class="show d3" x="104" y="119" text-anchor="start" font-size="12" letter-spacing="3">UBER</text>
-        <text class="show d3" x="300" y="119" text-anchor="middle" font-size="12" letter-spacing="2">&lt;  &lt;  &lt;  &lt;  &lt;        &gt;  &gt;  &gt;  &gt;  &gt;</text>
-        <text class="show d3" x="496" y="119" text-anchor="end" font-size="12" letter-spacing="2">EST. 2026</text>
-
-        <!-- header hatch row (filled by JS) -->
-        <g id="hudHatchTop"></g>
-
-        <!-- side decor -->
-        <g class="show d4" fill="var(--red)">
-          <rect x="86" y="210" width="2" height="70"/>
-          <rect x="94" y="235" width="2" height="44"/>
-          <rect x="512" y="210" width="2" height="70"/>
-          <rect x="504" y="235" width="2" height="44"/>
-        </g>
-
-        <!-- UBER wordmark -->
-        <g class="hud-wm" fill="var(--red)" filter="url(#uberGlow)" transform="translate(111,245)">
+        <g class="boot-wm-g" fill="var(--red)" filter="url(#uberGlow)">
           <path pathLength="1" transform="translate(0,5)" d="M0,0 L22,0 L22,98 L66,98 L66,0 L88,0 L88,108 L74,120 L14,120 L0,106 Z"/>
           <path pathLength="1" transform="translate(102,5)" fill-rule="evenodd"
                 d="M0,0 L62,0 L84,22 L84,52 L70,60 L84,68 L84,98 L62,120 L0,120 Z
@@ -86,28 +51,14 @@
                 d="M0,0 L62,0 L84,22 L84,52 L62,72 L84,120 L58,120 L40,76 L22,76 L22,120 L0,120 Z
                    M22,16 L60,16 L60,50 L22,50 Z"/>
         </g>
-
-        <!-- tagline -->
-        <text class="hud-jp show d6" x="300" y="412" text-anchor="middle"
-              font-size="20" letter-spacing="6">困難を越えて星々へ</text>
-
-        <!-- progress bar (filled by JS) -->
-        <g id="hudProgress"></g>
-
-        <!-- complete -->
-        <text class="flash" style="--ad:2.7s;--bd:3.3s" x="300" y="470" text-anchor="middle"
-              font-size="14" letter-spacing="3">&lt;&lt;&lt;  COMPLETE  &gt;&gt;&gt;</text>
-
-        <!-- bottom hatch rows (filled by JS) -->
-        <g id="hudHatchBot"></g>
-
-        <!-- corner labels -->
-        <text class="show d5" x="92" y="592" text-anchor="start" font-size="10" letter-spacing="1">UBER CORP TERMINAL</text>
-        <text class="show d5" x="508" y="592" text-anchor="end" font-size="10" letter-spacing="1">BRAINLINK V2.34.2</text>
       </svg>
+      <div class="boot-ready">&gt;&gt;&gt;  SYSTEM READY  &lt;&lt;&lt;</div>
     </div>
+
     <div class="intro-skip">TAP TO SKIP</div>
   </div>
+
+  <div id="bootflash" aria-hidden="true"></div>
 
   <header class="topbar">
     <div class="brand">
