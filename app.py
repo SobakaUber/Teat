@@ -18,7 +18,9 @@ is built from its first published port.
 
 import os
 import socket
+import threading
 import time
+from collections import deque
 from datetime import datetime, timezone
 
 import docker
@@ -165,6 +167,50 @@ def api_net():
     return jsonify({"online": _internet_online()})
 
 
+# --- Docker event log (background listener) ---------------------------------
+_events = deque(maxlen=250)
+# Noisy actions we don't want to clutter the log with.
+_EVENT_SKIP_PREFIXES = ("exec_",)
+
+
+def _events_worker():
+    """Stream container events from Docker into an in-memory ring buffer."""
+    while True:
+        cli = None
+        try:
+            cli = docker.from_env()  # dedicated long-lived client for the stream
+            for ev in cli.events(decode=True):
+                if ev.get("Type") != "container":
+                    continue
+                action = ev.get("Action", "")
+                if action.startswith(_EVENT_SKIP_PREFIXES):
+                    continue
+                attrs = (ev.get("Actor", {}) or {}).get("Attributes", {}) or {}
+                _events.appendleft({
+                    "time": ev.get("time"),
+                    "action": action,
+                    "name": attrs.get("name", ""),
+                    "image": attrs.get("image", ""),
+                })
+        except Exception:  # noqa: BLE001 - keep retrying on any failure
+            try:
+                if cli is not None:
+                    cli.close()
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(3)
+
+
+def _start_events_worker():
+    t = threading.Thread(target=_events_worker, name="docker-events", daemon=True)
+    t.start()
+
+
+@app.route("/api/events")
+def api_events():
+    return jsonify({"events": list(_events)})
+
+
 def _cpu_temp():
     """Best-effort CPU temperature in °C from sysfs, or None if unavailable."""
     import glob
@@ -296,6 +342,11 @@ def index():
 @app.route("/healthz")
 def healthz():
     return jsonify({"ok": True})
+
+
+# Start the Docker event listener as soon as the app is imported (works under
+# both `python app.py` and a WSGI server).
+_start_events_worker()
 
 
 if __name__ == "__main__":

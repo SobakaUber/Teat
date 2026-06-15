@@ -10,7 +10,29 @@
   const subStat = document.getElementById("subStat");
   const refreshBtn = document.getElementById("refresh");
 
-  const REFRESH_MS = 5000;
+  // --- Settings (persisted in localStorage) -------------------------
+  const SET_KEY = "uberSettings";
+  const SET_DEFAULTS = { poll: 5, intro: true, sound: true, globe: true, fx: true, tempUnit: "C" };
+  let settings = (() => {
+    try { return { ...SET_DEFAULTS, ...JSON.parse(localStorage.getItem(SET_KEY) || "{}") }; }
+    catch { return { ...SET_DEFAULTS }; }
+  })();
+  function saveSettings() {
+    try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+  }
+  let pollTimer = null;
+  function applyPoll() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(load, Math.max(2, settings.poll) * 1000);
+  }
+  function applyFx() {
+    document.body.classList.toggle("no-fx", !settings.fx);
+  }
+  function applySettings() {
+    applyFx();
+    applyPoll();
+    if (globeOnline) startGlobe(); // re-apply rotation on/off
+  }
 
   // Status -> css modifier + label
   const STATUS_INFO = {
@@ -340,6 +362,7 @@
   // Short terminal "tick" played per printed boot line.
   let lastTick = 0;
   function tick(vol) {
+    if (!settings.sound) return;
     const ctx = audioCtx;
     if (!ctx || ctx.state !== "running") return;
     const now = ctx.currentTime;
@@ -457,7 +480,7 @@
     // A couple of glitch ticks as UBER snaps in.
     tick(0.14); setTimeout(() => tick(0.12), 90); setTimeout(() => tick(0.1), 200);
     // Start the cinematic so its boom lands on the desktop reveal (~3s).
-    setTimeout(() => { const ctx = ensureAudio(); if (ctx) scheduleBoot(ctx); }, 1500);
+    if (settings.sound) setTimeout(() => { const ctx = ensureAudio(); if (ctx) scheduleBoot(ctx); }, 1500);
     // Hold the big UBER splash before revealing the dashboard.
     setTimeout(revealDesktop, 3000);
   }
@@ -490,21 +513,6 @@
     intro.addEventListener("click", skipBoot, { once: true });
     runBoot();
   };
-
-  if (gate) {
-    let begun = false;
-    const begin = () => {
-      if (begun) return;
-      begun = true;
-      gate.classList.add("gate-out");
-      startSequence();
-      setTimeout(() => gate.remove(), 520);
-    };
-    gate.addEventListener("click", begin);
-    window.addEventListener("keydown", begin, { once: true });
-  } else {
-    startSequence();
-  }
 
   // --- Live clock ---------------------------------------------------
   const clockEl = document.getElementById("clock");
@@ -571,10 +579,16 @@
     globeRAF = requestAnimationFrame(globeFrame);
   }
   function startGlobe() {
-    if (globeRAF || !globeCanvas) return;
+    if (!globeCanvas) return;
     if (globeErr) globeErr.hidden = true;
     globeCanvas.style.visibility = "visible";
-    globeFrame();
+    if (settings.globe) {
+      if (!globeRAF) globeFrame();
+    } else {
+      // rotation disabled: draw a single static frame
+      if (globeRAF) { cancelAnimationFrame(globeRAF); globeRAF = null; }
+      drawGlobe(globeT);
+    }
   }
   function stopGlobe() {
     if (globeRAF) { cancelAnimationFrame(globeRAF); globeRAF = null; }
@@ -659,6 +673,8 @@
     const temp = s.cpu_temp;
     const tempPct = temp != null ? Math.min(100, Math.round(temp)) : 0;
     const tempCls = temp == null ? "" : temp >= 80 ? "hot" : temp >= 60 ? "warn" : "cool";
+    const tempStr = temp == null ? "н/д"
+      : settings.tempUnit === "F" ? `${(temp * 9 / 5 + 32).toFixed(1)} °F` : `${temp.toFixed(1)} °C`;
     winBody.innerHTML = `
       <div class="mon">
         <div class="mon-grid">
@@ -672,7 +688,7 @@
           <div class="mon-bar"><div class="mon-bar-fill" style="width:${loadPct}%"></div></div>
         </div>
         <div class="mon-row">
-          <div class="mon-head"><span>CPU Temp</span><b>${temp != null ? temp.toFixed(1) + " °C" : "н/д"}</b></div>
+          <div class="mon-head"><span>CPU Temp</span><b>${tempStr}</b></div>
           ${temp != null ? `<div class="mon-bar"><div class="mon-bar-fill ${tempCls}" style="width:${tempPct}%"></div></div>` : ""}
         </div>
         <div class="mon-row">
@@ -702,9 +718,86 @@
       </div>`;
   }
 
+  // Event log -------------------------------------------------------
+  function eventClass(a) {
+    if (/(^start|unpause|: healthy|^restart)/.test(a)) return "ok";
+    if (/(die|^stop|^kill|oom|: unhealthy|destroy)/.test(a)) return "bad";
+    if (/(pause|: starting|^restart|health)/.test(a)) return "warn";
+    return "dim";
+  }
+  async function renderEvents() {
+    let data;
+    try {
+      const r = await fetch("/api/events", { cache: "no-store" });
+      data = await r.json();
+    } catch {
+      winBody.innerHTML = `<div class="win-ph"><div class="win-ph-glyph">⚠</div><div class="win-ph-sub">нет данных</div></div>`;
+      return;
+    }
+    if (currentWin !== "logs") return;
+    const evs = data.events || [];
+    const rows = evs.map((e) => {
+      const t = e.time ? new Date(e.time * 1000).toLocaleTimeString("ru-RU") : "--:--:--";
+      return `<div class="ev"><span class="ev-t">${t}</span><span class="ev-a ${eventClass(e.action)}">${escapeHtml(e.action)}</span><span class="ev-n">${escapeHtml(e.name || "")}</span></div>`;
+    }).join("");
+    winBody.innerHTML = `<div class="evlog">${rows || '<div class="win-ph-sub">Событий пока нет. Старт / стоп / перезапуск контейнеров появятся здесь.</div>'}</div>`;
+  }
+
+  // Settings --------------------------------------------------------
+  function settingToggle(id, label) {
+    const on = !!settings[id];
+    return `<div class="set-row"><span class="set-lbl">${label}</span>
+      <button class="set-toggle ${on ? "on" : ""}" data-set="${id}" role="switch" aria-checked="${on}"><span class="knob"></span></button></div>`;
+  }
+  function renderSettings() {
+    winBody.innerHTML = `
+      <div class="settings">
+        <div class="set-row"><span class="set-lbl">Интервал обновления</span>
+          <select class="set-select" data-set="poll">
+            ${[2, 5, 10, 30].map((v) => `<option value="${v}" ${settings.poll == v ? "selected" : ""}>${v}s</option>`).join("")}
+          </select></div>
+        <div class="set-row"><span class="set-lbl">Единицы температуры</span>
+          <select class="set-select" data-set="tempUnit">
+            <option value="C" ${settings.tempUnit === "C" ? "selected" : ""}>°C</option>
+            <option value="F" ${settings.tempUnit === "F" ? "selected" : ""}>°F</option>
+          </select></div>
+        ${settingToggle("intro", "Заставка при загрузке")}
+        ${settingToggle("sound", "Звук")}
+        ${settingToggle("globe", "Вращение глобуса")}
+        ${settingToggle("fx", "Эффекты (сканлайны/виньетка)")}
+        <div class="set-actions">
+          <button class="set-btn" data-act="replay">⟳ Перезапустить заставку</button>
+          <button class="set-btn danger" data-act="reset">Сбросить настройки</button>
+        </div>
+      </div>`;
+  }
+
+  // About -----------------------------------------------------------
+  function renderAbout() {
+    const host = window.location.hostname;
+    const cs = lastContainers;
+    const running = cs.filter((c) => c.status === "running").length;
+    winBody.innerHTML = `
+      <div class="about">
+        <div class="about-logo">UBER<span>//</span>CONTROL</div>
+        <div class="about-ver">dashboard v2.34.2 · brainlink terminal</div>
+        <div class="about-jp">困難を越えて星々へ</div>
+        <div class="about-rows">
+          <div class="krow"><span class="k">Node</span><span class="v">${escapeHtml(host)}</span></div>
+          <div class="krow"><span class="k">Modules</span><span class="v">${running}/${cs.length} online</span></div>
+          <div class="krow"><span class="k">Engine</span><span class="v">Flask · Docker SDK</span></div>
+          <div class="krow"><span class="k">Network</span><span class="v">${globeOnline ? "ONLINE" : "OFFLINE"}</span></div>
+        </div>
+        <div class="about-foot">// per aspera ad astra</div>
+      </div>`;
+  }
+
   function fillWindow(winId, title) {
     if (winId === "sysmon") { renderSysmon(); return; }
     if (winId === "network") { renderNetwork(); return; }
+    if (winId === "logs") { renderEvents(); return; }
+    if (winId === "settings") { renderSettings(); return; }
+    if (winId === "about") { renderAbout(); return; }
     winBody.innerHTML = placeholderBody(title);
   }
 
@@ -717,6 +810,7 @@
     fillWindow(winId, title);
     if (winTimer) { clearInterval(winTimer); winTimer = null; }
     if (winId === "sysmon") winTimer = setInterval(() => fillWindow(winId, title), 4000);
+    if (winId === "logs") winTimer = setInterval(() => fillWindow(winId, title), 3000);
   }
   function closeWindow() {
     if (winLayer) winLayer.hidden = true;
@@ -744,6 +838,62 @@
     if (e.key === "Escape") { closeWindow(); closeMenu(); }
   });
 
+  // Settings controls (delegated; winBody persists across renders).
+  if (winBody) {
+    winBody.addEventListener("click", (e) => {
+      const tg = e.target.closest(".set-toggle");
+      if (tg) {
+        const k = tg.dataset.set;
+        settings[k] = !settings[k];
+        saveSettings();
+        applySettings();
+        renderSettings();
+        return;
+      }
+      const btn = e.target.closest(".set-btn");
+      if (btn) {
+        if (btn.dataset.act === "reset") {
+          settings = { ...SET_DEFAULTS };
+          saveSettings();
+          applySettings();
+          renderSettings();
+        } else if (btn.dataset.act === "replay") {
+          location.reload();
+        }
+      }
+    });
+    winBody.addEventListener("change", (e) => {
+      const sel = e.target.closest(".set-select");
+      if (!sel) return;
+      const k = sel.dataset.set;
+      settings[k] = k === "poll" ? parseInt(sel.value, 10) : sel.value;
+      saveSettings();
+      applySettings();
+    });
+  }
+
+  // --- Startup ------------------------------------------------------
+  applyFx();
   load();
-  setInterval(load, REFRESH_MS);
+  applyPoll();
+
+  if (!settings.intro) {
+    // Intro disabled in settings: go straight to the dashboard.
+    if (gate) gate.remove();
+    if (intro) intro.remove();
+    document.body.classList.add("booted");
+  } else if (gate) {
+    let begun = false;
+    const begin = () => {
+      if (begun) return;
+      begun = true;
+      gate.classList.add("gate-out");
+      startSequence();
+      setTimeout(() => gate.remove(), 520);
+    };
+    gate.addEventListener("click", begin);
+    window.addEventListener("keydown", begin, { once: true });
+  } else {
+    startSequence();
+  }
 })();
