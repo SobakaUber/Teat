@@ -150,8 +150,9 @@ body {
 
 .intro-stage {
   position: relative;
-  width: min(600px, 94vw);
-  aspect-ratio: 600 / 420;
+  aspect-ratio: 600 / 640;
+  height: min(640px, 90vh);
+  max-width: 94vw;
 }
 
 .intro-dot {
@@ -173,63 +174,64 @@ body {
   100% { transform: scale(1); opacity: 0; }
 }
 
-/* Broken HUD frame (inline SVG) */
-.intro-frame-svg {
+/* Full HUD boot sequence (inline SVG) */
+.intro-hud {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 0 10px rgba(255, 34, 51, 0.25));
 }
-.intro-frame-svg .fl {
-  fill: none;
-  stroke: var(--red);
-  stroke-width: 2.2;
-  stroke-dasharray: 1400;
-  stroke-dashoffset: 1400;
-  animation: draw 1.0s ease 0.5s forwards;
-}
-.intro-frame-svg .fb {
-  fill: none;
-  stroke: var(--red);
-  stroke-width: 4.5;
-  stroke-linejoin: miter;
-  stroke-dasharray: 320;
-  stroke-dashoffset: 320;
-  animation: draw 0.7s ease 0.45s forwards;
-}
-.intro-frame-svg .fnode {
-  fill: var(--red);
-  opacity: 0;
-  animation: fxIn 0.3s ease 1.55s forwards;
-}
-.intro-frame-svg .ftext {
-  fill: var(--red-bright);
-  opacity: 0;
+.intro-hud text {
   font-family: "JetBrains Mono", ui-monospace, monospace;
+  fill: var(--red);
 }
-.intro-frame-svg .est { animation: textIn 0.5s ease 1.95s both; }
-.intro-frame-svg .jp  { fill: var(--text); animation: textIn 0.6s ease 2.15s both; }
 
-@keyframes draw { to { stroke-dashoffset: 0; } }
-@keyframes fxIn { from { opacity: 0; } to { opacity: 1; } }
+/* generic appear + stroke draw-on */
+.intro-hud .show { opacity: 0; animation: hudFade 0.5s ease both; }
+.intro-hud .draw {
+  fill: none;
+  stroke: var(--red);
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: drawHud 0.8s ease both;
+}
+@keyframes hudFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drawHud { to { stroke-dashoffset: 0; } }
 
-/* UBER wordmark — clean wipe reveal with a soft glow build */
-.intro-wordmark {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: min(400px, 72vw);
-  transform: translate(-50%, -52%);
+/* opening reticle: dot expands, fades in then out as the HUD assembles */
+.intro-hud .reticle { opacity: 0; animation: reticle 1.5s ease 0.3s forwards; }
+@keyframes reticle {
+  0% { opacity: 0; } 22% { opacity: 1; } 68% { opacity: 1; } 100% { opacity: 0; }
+}
+
+/* stagger delays — declared after .show/.draw so they win the cascade */
+.intro-hud .d1 { animation-delay: 0.9s; }
+.intro-hud .d2 { animation-delay: 1.05s; }
+.intro-hud .d3 { animation-delay: 1.2s; }
+.intro-hud .d4 { animation-delay: 1.35s; }
+.intro-hud .d5 { animation-delay: 1.55s; }
+.intro-hud .d6 { animation-delay: 2.4s; }
+
+/* UBER wordmark — clean wipe reveal */
+.intro-hud .hud-wm {
   opacity: 0;
-  animation: wmReveal 1.0s cubic-bezier(0.16, 0.8, 0.24, 1) 1.45s both;
+  animation: wmReveal 1.0s cubic-bezier(0.16, 0.8, 0.24, 1) 1.6s both;
 }
 @keyframes wmReveal {
-  0%   { opacity: 0; clip-path: inset(0 100% 0 0); filter: blur(3px); }
-  55%  { opacity: 1; filter: blur(0); }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0); }
+  0%   { opacity: 0; clip-path: inset(0 100% 0 0); }
+  40%  { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
 }
+.intro-hud .hud-jp { fill: var(--text); }
+
+/* status texts that appear, then blink several times at the end */
+.intro-hud .flash {
+  opacity: 0;
+  animation: hudFade 0.4s ease var(--ad, 1.3s) both,
+             hudBlink 0.28s steps(1) var(--bd, 3.3s) 6;
+}
+@keyframes hudBlink { 0%, 49% { opacity: 0.12; } 50%, 100% { opacity: 1; } }
 
 @keyframes textIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -574,9 +576,9 @@ main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-dot, .intro-frame-svg .fl, .intro-frame-svg .fb,
-  .intro-frame-svg .fnode, .intro-frame-svg .ftext, .intro-wordmark,
-  .intro-skip, .card.enter, .status-dot.running::after,
+  .intro-dot, .intro-hud .show, .intro-hud .draw, .intro-hud .reticle,
+  .intro-hud .hud-wm, .intro-hud .flash, .intro-skip, .card.enter,
+  .status-dot.running::after,
   .start-title, .start-title::before, .start-title::after, .start-mark {
     animation-duration: 0.01s !important;
   }

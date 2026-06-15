@@ -27,71 +27,83 @@
     <div class="intro-stage">
       <i class="intro-dot"></i>
 
-      <!-- Broken HUD frame -->
-      <svg class="intro-frame-svg" viewBox="0 0 600 420" preserveAspectRatio="xMidYMid meet">
-        <!-- corner brackets -->
-        <path class="fb" d="M30,95 L30,40 L95,40"/>
-        <path class="fb" d="M505,40 L570,40 L570,95"/>
-        <path class="fb" d="M570,325 L570,380 L505,380"/>
-        <path class="fb" d="M95,380 L30,380 L30,325"/>
-        <!-- broken border segments -->
-        <path class="fl" d="M120,40 L290,40"/>
-        <path class="fl" d="M330,40 L480,40"/>
-        <path class="fl" d="M570,120 L570,200"/>
-        <path class="fl" d="M570,235 L570,300"/>
-        <path class="fl" d="M480,380 L320,380"/>
-        <path class="fl" d="M280,380 L120,380"/>
-        <path class="fl" d="M30,300 L30,210"/>
-        <path class="fl" d="M30,180 L30,120"/>
-        <!-- left chevron ticks -->
-        <path class="fl" d="M44,150 L60,162 L44,174"/>
-        <path class="fl" d="M44,182 L60,194 L44,206"/>
-        <path class="fl" d="M44,214 L60,226 L44,238"/>
-        <!-- top divider with arrowhead + dashes -->
-        <path class="fl" d="M70,95 L470,95"/>
-        <path class="fl" d="M470,95 L454,87"/>
-        <path class="fl" d="M470,95 L454,103"/>
-        <path class="fl" d="M482,95 L500,95"/>
-        <path class="fl" d="M508,95 L520,95"/>
-        <!-- right circuit traces -->
-        <path class="fl" d="M495,150 L545,150 L545,185 L568,185"/>
-        <path class="fl" d="M515,170 L515,250 L548,278"/>
-        <circle class="fnode" cx="568" cy="185" r="3.4"/>
-        <circle class="fnode" cx="548" cy="278" r="3.4"/>
-        <circle class="fnode" cx="495" cy="150" r="3.4"/>
-        <circle class="fnode" cx="545" cy="150" r="3.4"/>
-        <!-- labels -->
-        <text class="ftext est" x="558" y="62" text-anchor="end" font-size="16" letter-spacing="3">EST. 2026</text>
-        <text class="ftext jp" x="300" y="366" text-anchor="middle" font-size="22" letter-spacing="6">困難を越えて星々へ</text>
-      </svg>
-
-      <!-- UBER wordmark (Arasaka-style angular glyphs) -->
-      <svg class="intro-wordmark" viewBox="0 0 378 130" preserveAspectRatio="xMidYMid meet">
+      <!-- Full HUD boot sequence -->
+      <svg class="intro-hud" viewBox="0 0 600 640" preserveAspectRatio="xMidYMid meet">
         <defs>
           <filter id="uberGlow" x="-12%" y="-25%" width="124%" height="150%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="b"/>
-            <feMerge>
-              <feMergeNode in="b"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        <g fill="var(--red)" filter="url(#uberGlow)">
-          <!-- U -->
+
+        <!-- opening reticle -->
+        <g class="reticle" fill="none" stroke="var(--red)" stroke-width="2">
+          <path d="M262,260 L250,260 L250,272"/>
+          <path d="M338,260 L350,260 L350,272"/>
+          <path d="M250,328 L250,340 L262,340"/>
+          <path d="M350,328 L350,340 L338,340"/>
+          <circle cx="220" cy="236" r="3" fill="var(--red)" stroke="none"/>
+          <circle cx="380" cy="236" r="3" fill="var(--red)" stroke="none"/>
+          <circle cx="220" cy="364" r="3" fill="var(--red)" stroke="none"/>
+          <circle cx="380" cy="364" r="3" fill="var(--red)" stroke="none"/>
+          <rect x="255" y="350" width="90" height="6" rx="2" fill="var(--red)" stroke="none"/>
+        </g>
+
+        <!-- top status bar -->
+        <rect class="show d1" x="70" y="64" width="118" height="12" fill="var(--red)"/>
+        <rect class="show d1" x="412" y="64" width="118" height="12" fill="var(--red)"/>
+        <text class="flash" style="--ad:1.3s;--bd:3.3s" x="300" y="74" text-anchor="middle"
+              font-size="12" letter-spacing="2">BRAINLINK ESTABLISHED</text>
+
+        <!-- header row -->
+        <rect class="show d3" x="90" y="110" width="6" height="6" fill="var(--red)"/>
+        <rect class="show d3" x="504" y="110" width="6" height="6" fill="var(--red)"/>
+        <text class="show d3" x="104" y="119" text-anchor="start" font-size="12" letter-spacing="3">UBER</text>
+        <text class="show d3" x="300" y="119" text-anchor="middle" font-size="12" letter-spacing="2">&lt;  &lt;  &lt;  &lt;  &lt;        &gt;  &gt;  &gt;  &gt;  &gt;</text>
+        <text class="show d3" x="496" y="119" text-anchor="end" font-size="12" letter-spacing="2">EST. 2026</text>
+
+        <!-- header hatch row (filled by JS) -->
+        <g id="hudHatchTop"></g>
+
+        <!-- side decor -->
+        <g class="show d4" fill="var(--red)">
+          <rect x="86" y="210" width="2" height="70"/>
+          <rect x="94" y="235" width="2" height="44"/>
+          <rect x="512" y="210" width="2" height="70"/>
+          <rect x="504" y="235" width="2" height="44"/>
+        </g>
+
+        <!-- UBER wordmark -->
+        <g class="hud-wm" fill="var(--red)" filter="url(#uberGlow)" transform="translate(111,245)">
           <path transform="translate(0,5)" d="M0,0 L22,0 L22,98 L66,98 L66,0 L88,0 L88,108 L74,120 L14,120 L0,106 Z"/>
-          <!-- B -->
           <path transform="translate(102,5)" fill-rule="evenodd"
                 d="M0,0 L62,0 L84,22 L84,52 L70,60 L84,68 L84,98 L62,120 L0,120 Z
                    M22,16 L60,16 L60,50 L22,50 Z
                    M22,70 L60,70 L60,104 L22,104 Z"/>
-          <!-- E -->
           <path transform="translate(200,5)"
                 d="M0,0 L68,0 L80,12 L80,22 L22,22 L22,49 L60,49 L60,71 L22,71 L22,98 L80,98 L80,108 L68,120 L0,120 Z"/>
-          <!-- R -->
           <path transform="translate(294,5)" fill-rule="evenodd"
                 d="M0,0 L62,0 L84,22 L84,52 L62,72 L84,120 L58,120 L40,76 L22,76 L22,120 L0,120 Z
                    M22,16 L60,16 L60,50 L22,50 Z"/>
         </g>
+
+        <!-- tagline -->
+        <text class="hud-jp show d6" x="300" y="412" text-anchor="middle"
+              font-size="20" letter-spacing="6">困難を越えて星々へ</text>
+
+        <!-- progress bar (filled by JS) -->
+        <g id="hudProgress"></g>
+
+        <!-- complete -->
+        <text class="flash" style="--ad:2.7s;--bd:3.3s" x="300" y="470" text-anchor="middle"
+              font-size="14" letter-spacing="3">&lt;&lt;&lt;  COMPLETE  &gt;&gt;&gt;</text>
+
+        <!-- bottom hatch rows (filled by JS) -->
+        <g id="hudHatchBot"></g>
+
+        <!-- corner labels -->
+        <text class="show d5" x="92" y="592" text-anchor="start" font-size="10" letter-spacing="1">UBER CORP TERMINAL</text>
+        <text class="show d5" x="508" y="592" text-anchor="end" font-size="10" letter-spacing="1">BRAINLINK V2.34.2</text>
       </svg>
     </div>
     <div class="intro-skip">TAP TO SKIP</div>

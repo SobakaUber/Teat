@@ -318,6 +318,60 @@
   // --- Tap-to-start gate + boot intro -------------------------------
   const gate = document.getElementById("start-gate");
   const intro = document.getElementById("intro");
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  // Build the repetitive HUD decorations (hatch rows, progress cells) so the
+  // markup stays manageable. Elements fade in with staggered delays.
+  function buildHud() {
+    if (!intro) return;
+
+    const addHatch = (groupId, y, x0, x1, baseDelay) => {
+      const g = intro.querySelector("#" + groupId);
+      if (!g) return;
+      let i = 0;
+      for (let x = x0; x <= x1; x += 16, i++) {
+        let el;
+        if (i % 7 === 3) {
+          el = document.createElementNS(SVGNS, "rect");
+          el.setAttribute("x", x); el.setAttribute("y", y - 5);
+          el.setAttribute("width", 5); el.setAttribute("height", 5);
+          el.setAttribute("fill", "var(--red)");
+        } else {
+          // alternating diagonal ticks
+          const up = i % 2 === 0;
+          el = document.createElementNS(SVGNS, "line");
+          el.setAttribute("x1", x); el.setAttribute("y1", up ? y + 6 : y - 6);
+          el.setAttribute("x2", x + 9); el.setAttribute("y2", up ? y - 6 : y + 6);
+          el.setAttribute("stroke", "var(--red)"); el.setAttribute("stroke-width", "2");
+        }
+        el.setAttribute("class", "show");
+        el.style.animationDelay = (baseDelay + i * 0.012) + "s";
+        g.appendChild(el);
+      }
+    };
+
+    addHatch("hudHatchTop", 140, 100, 500, 1.0);
+    addHatch("hudHatchBot", 528, 90, 290, 1.0);
+    addHatch("hudHatchBot", 528, 310, 510, 1.0);
+    addHatch("hudHatchBot", 548, 90, 290, 1.1);
+    addHatch("hudHatchBot", 548, 310, 510, 1.1);
+
+    // progress cells fill left -> right
+    const prog = intro.querySelector("#hudProgress");
+    if (prog) {
+      let i = 0;
+      for (let x = 200; x <= 398; x += 8, i++) {
+        const c = document.createElementNS(SVGNS, "rect");
+        c.setAttribute("x", x); c.setAttribute("y", 484);
+        c.setAttribute("width", 5); c.setAttribute("height", 11);
+        c.setAttribute("fill", "var(--red)");
+        c.setAttribute("class", "show");
+        c.style.animationDelay = (0.95 + i * 0.03) + "s";
+        prog.appendChild(c);
+      }
+    }
+  }
+  buildHud();
 
   let ended = false;
   const endIntro = () => {
@@ -333,7 +387,7 @@
     playBoot();
     if (!intro) return;
     intro.classList.remove("pending");
-    const auto = setTimeout(endIntro, 4200);
+    const auto = setTimeout(endIntro, 5400);
     intro.addEventListener("click", () => { clearTimeout(auto); endIntro(); }, { once: true });
   };
 
