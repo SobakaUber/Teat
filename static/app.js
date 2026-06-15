@@ -656,6 +656,9 @@
     const loadPct = Math.min(100, Math.round((load1 / cpuN) * 100));
     const mem = s.mem;
     const memPct = mem && mem.total ? Math.round((mem.used / mem.total) * 100) : 0;
+    const temp = s.cpu_temp;
+    const tempPct = temp != null ? Math.min(100, Math.round(temp)) : 0;
+    const tempCls = temp == null ? "" : temp >= 80 ? "hot" : temp >= 60 ? "warn" : "cool";
     winBody.innerHTML = `
       <div class="mon">
         <div class="mon-grid">
@@ -667,6 +670,10 @@
         <div class="mon-row">
           <div class="mon-head"><span>CPU Load (1m)</span><b>${load1.toFixed(2)} / ${cpuN}</b></div>
           <div class="mon-bar"><div class="mon-bar-fill" style="width:${loadPct}%"></div></div>
+        </div>
+        <div class="mon-row">
+          <div class="mon-head"><span>CPU Temp</span><b>${temp != null ? temp.toFixed(1) + " °C" : "н/д"}</b></div>
+          ${temp != null ? `<div class="mon-bar"><div class="mon-bar-fill ${tempCls}" style="width:${tempPct}%"></div></div>` : ""}
         </div>
         <div class="mon-row">
           <div class="mon-head"><span>Memory</span><b>${mem ? `${fmtKB(mem.used)} / ${fmtKB(mem.total)} · ${memPct}%` : "—"}</b></div>
@@ -709,7 +716,7 @@
     winLayer.hidden = false;
     fillWindow(winId, title);
     if (winTimer) { clearInterval(winTimer); winTimer = null; }
-    if (winId === "sysmon") winTimer = setInterval(() => fillWindow(winId, title), 2500);
+    if (winId === "sysmon") winTimer = setInterval(() => fillWindow(winId, title), 4000);
   }
   function closeWindow() {
     if (winLayer) winLayer.hidden = true;

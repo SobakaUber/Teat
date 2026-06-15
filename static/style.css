@@ -910,6 +910,9 @@ main {
 .mon-head b { color: var(--red-bright); font-weight: 700; }
 .mon-bar { height: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.02); }
 .mon-bar-fill { height: 100%; background: linear-gradient(90deg, var(--red-deep), var(--red)); box-shadow: 0 0 10px var(--red-glow); transition: width 0.4s ease; }
+.mon-bar-fill.cool { background: linear-gradient(90deg, #0c7a4a, var(--green)); box-shadow: 0 0 10px rgba(43, 255, 154, 0.35); }
+.mon-bar-fill.warn { background: linear-gradient(90deg, #9c5a00, var(--amber)); box-shadow: 0 0 10px rgba(255, 177, 61, 0.4); }
+.mon-bar-fill.hot  { background: linear-gradient(90deg, var(--red-deep), #ff3a46); box-shadow: 0 0 12px var(--red-glow); }
 
 /* Network Map window */
 .net { display: flex; flex-direction: column; gap: 10px; }

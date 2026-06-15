@@ -32,9 +32,30 @@ SELF_CONTAINER = os.environ.get("HOSTNAME", "")
 LINK_SCHEME = os.environ.get("LINK_SCHEME", "http")
 
 
+_docker_client = None
+
+
 def _client():
-    """Create a Docker client from the environment / mounted socket."""
-    return docker.from_env()
+    """Return a shared Docker client (created once, reused across requests).
+
+    Creating a new client per request leaks connections/file descriptors and
+    slowly drives up system load, so we cache a single instance.
+    """
+    global _docker_client
+    if _docker_client is None:
+        _docker_client = docker.from_env()
+    return _docker_client
+
+
+def _reset_client():
+    """Drop the cached client so the next call reconnects (after an error)."""
+    global _docker_client
+    try:
+        if _docker_client is not None:
+            _docker_client.close()
+    except Exception:  # noqa: BLE001
+        pass
+    _docker_client = None
 
 
 def _truthy(value):
@@ -144,6 +165,40 @@ def api_net():
     return jsonify({"online": _internet_online()})
 
 
+def _cpu_temp():
+    """Best-effort CPU temperature in °C from sysfs, or None if unavailable."""
+    import glob
+
+    # Prefer a labelled package/core sensor among the thermal zones.
+    best = None
+    for zone in glob.glob("/sys/class/thermal/thermal_zone*"):
+        try:
+            with open(zone + "/type") as fh:
+                typ = fh.read().strip().lower()
+            with open(zone + "/temp") as fh:
+                val = int(fh.read().strip())
+        except (OSError, ValueError):
+            continue
+        celsius = val / 1000.0
+        if not 0 < celsius < 150:
+            continue
+        if any(k in typ for k in ("x86_pkg", "coretemp", "cpu", "k10temp", "core")):
+            return round(celsius, 1)
+        best = celsius if best is None else max(best, celsius)
+
+    if best is None:
+        for inp in glob.glob("/sys/class/hwmon/hwmon*/temp*_input"):
+            try:
+                with open(inp) as fh:
+                    celsius = int(fh.read().strip()) / 1000.0
+            except (OSError, ValueError):
+                continue
+            if 0 < celsius < 150:
+                best = celsius if best is None else max(best, celsius)
+
+    return round(best, 1) if best is not None else None
+
+
 def _read_meminfo():
     info = {}
     try:
@@ -169,6 +224,7 @@ def api_stats():
         stats["load"] = None
 
     stats["mem"] = _read_meminfo()
+    stats["cpu_temp"] = _cpu_temp()
 
     try:
         with open("/proc/uptime") as fh:
@@ -185,6 +241,7 @@ def api_stats():
         }
         stats["docker"] = client.version().get("Version")
     except Exception:  # noqa: BLE001
+        _reset_client()
         stats["containers"] = None
 
     return jsonify(stats)
@@ -200,6 +257,7 @@ def api_action(container_id, action):
     except docker.errors.NotFound:
         return jsonify({"error": "container not found"}), 404
     except Exception as exc:  # noqa: BLE001
+        _reset_client()
         return jsonify({"error": str(exc)}), 500
 
     # Refuse to stop/restart the dashboard's own container, otherwise the
@@ -221,6 +279,7 @@ def api_containers():
         client = _client()
         containers = client.containers.list(all=True)
     except Exception as exc:  # noqa: BLE001 - surface any docker error to the UI
+        _reset_client()
         return jsonify({"error": str(exc)}), 500
 
     items = [c for c in (_serialize(c) for c in containers) if c is not None]
