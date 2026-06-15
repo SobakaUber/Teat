@@ -226,9 +226,9 @@ body {
   animation: wmReveal 1.0s cubic-bezier(0.16, 0.8, 0.24, 1) 1.45s both;
 }
 @keyframes wmReveal {
-  0%   { opacity: 0; clip-path: inset(0 100% 0 0); filter: blur(3px) drop-shadow(0 0 0 transparent); }
-  55%  { opacity: 1; filter: blur(0) drop-shadow(0 0 6px rgba(255, 34, 51, 0.3)); }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0) drop-shadow(0 0 18px rgba(255, 34, 51, 0.5)); }
+  0%   { opacity: 0; clip-path: inset(0 100% 0 0); filter: blur(3px); }
+  55%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0); }
 }
 
 @keyframes textIn {

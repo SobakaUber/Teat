@@ -67,7 +67,16 @@
 
       <!-- UBER wordmark (Arasaka-style angular glyphs) -->
       <svg class="intro-wordmark" viewBox="0 0 378 130" preserveAspectRatio="xMidYMid meet">
-        <g fill="var(--red)">
+        <defs>
+          <filter id="uberGlow" x="-12%" y="-25%" width="124%" height="150%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="b"/>
+            <feMerge>
+              <feMergeNode in="b"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <g fill="var(--red)" filter="url(#uberGlow)">
           <!-- U -->
           <path transform="translate(0,5)" d="M0,0 L22,0 L22,98 L66,98 L66,0 L88,0 L88,108 L74,120 L14,120 L0,106 Z"/>
           <!-- B -->
