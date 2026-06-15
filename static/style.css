@@ -242,9 +242,10 @@ body {
 .boot-final.on .boot-uber::before { color: #1ad6ff; animation: glX 2.6s steps(2) 0.7s infinite; }
 .boot-final.on .boot-uber::after  { color: var(--red); animation: glY 2.2s steps(2) 0.9s infinite; }
 @keyframes uberIn {
-  0%   { opacity: 0; clip-path: inset(0 0 100% 0); }
-  40%  { opacity: 1; }
-  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+  /* negative side/expanded insets so the glow is never clipped */
+  0%   { opacity: 0; clip-path: inset(0 -45% 100% -45%); }
+  45%  { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(-50% -45% -50% -45%); }
 }
 @keyframes glX {
   0%, 86%, 100% { transform: translate(0, 0); opacity: 0; clip-path: inset(0 0 58% 0); }
