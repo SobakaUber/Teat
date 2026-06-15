@@ -128,7 +128,10 @@ def _serialize(container):
         "status": container.status,  # running / exited / paused / restarting ...
         "uptime": _uptime_seconds(state) if container.status == "running" else None,
         "health": (state.get("Health", {}) or {}).get("Status", ""),
-        "image": (container.image.tags[0] if container.image.tags else container.short_id),
+        # Use the configured image name from the already-fetched attrs.
+        # NB: container.image would trigger a separate image inspect per
+        # container on every poll, which drives up load badly.
+        "image": (container.attrs.get("Config") or {}).get("Image") or container.short_id,
         "ports": ports,
         "link_port": link_port,
         "url_override": labels.get("dashboard.url", ""),
@@ -280,10 +283,12 @@ def api_stats():
 
     try:
         client = _client()
-        conts = client.containers.list(all=True)
+        # Low-level call: one request returning summaries, no per-container
+        # inspect (containers.list() would inspect every container).
+        summary = client.api.containers(all=True)
         stats["containers"] = {
-            "total": len(conts),
-            "running": sum(1 for c in conts if c.status == "running"),
+            "total": len(summary),
+            "running": sum(1 for c in summary if c.get("State") == "running"),
         }
         stats["docker"] = client.version().get("Version")
     except Exception:  # noqa: BLE001
