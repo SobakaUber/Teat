@@ -17,6 +17,8 @@ is built from its first published port.
 """
 
 import os
+import socket
+import time
 from datetime import datetime, timezone
 
 import docker
@@ -113,6 +115,79 @@ def _serialize(container):
 
 
 ACTIONS = {"start", "stop", "restart"}
+
+
+# --- Internet connectivity (real internet, not just LAN) --------------------
+_net_cache = {"ts": 0.0, "online": False}
+
+
+def _internet_online():
+    """True if the server can reach the public internet (cached ~10s)."""
+    now = time.time()
+    if now - _net_cache["ts"] < 10:
+        return _net_cache["online"]
+    ok = False
+    for host, port in (("1.1.1.1", 443), ("8.8.8.8", 53)):
+        try:
+            s = socket.create_connection((host, port), timeout=1.5)
+            s.close()
+            ok = True
+            break
+        except OSError:
+            continue
+    _net_cache.update(ts=now, online=ok)
+    return ok
+
+
+@app.route("/api/net")
+def api_net():
+    return jsonify({"online": _internet_online()})
+
+
+def _read_meminfo():
+    info = {}
+    try:
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                key, _, rest = line.partition(":")
+                info[key] = int(rest.strip().split()[0])  # kB
+    except OSError:
+        return None
+    total = info.get("MemTotal", 0)
+    avail = info.get("MemAvailable", info.get("MemFree", 0))
+    return {"total": total, "avail": avail, "used": max(0, total - avail)}
+
+
+@app.route("/api/stats")
+def api_stats():
+    """Host/system stats for the System Monitor window."""
+    stats = {"online": _internet_online(), "cpu_count": os.cpu_count()}
+
+    try:
+        stats["load"] = list(os.getloadavg())
+    except (OSError, AttributeError):
+        stats["load"] = None
+
+    stats["mem"] = _read_meminfo()
+
+    try:
+        with open("/proc/uptime") as fh:
+            stats["host_uptime"] = int(float(fh.read().split()[0]))
+    except (OSError, ValueError):
+        stats["host_uptime"] = None
+
+    try:
+        client = _client()
+        conts = client.containers.list(all=True)
+        stats["containers"] = {
+            "total": len(conts),
+            "running": sum(1 for c in conts if c.status == "running"),
+        }
+        stats["docker"] = client.version().get("Version")
+    except Exception:  # noqa: BLE001
+        stats["containers"] = None
+
+    return jsonify(stats)
 
 
 @app.route("/api/containers/<container_id>/<action>", methods=["POST"])

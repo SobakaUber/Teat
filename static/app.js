@@ -113,6 +113,7 @@
 
   // id -> { el, hash }  — lets us touch the DOM only when data actually changed.
   const cards = new Map();
+  let lastContainers = [];
 
   function applySpine(el, c) {
     const spine = statusInfo(c).spine;
@@ -121,6 +122,7 @@
   }
 
   function render(containers) {
+    lastContainers = containers;
     const running = containers.filter((c) => c.status === "running").length;
     statRunning.textContent = `${running} online`;
     statTotal.textContent = `${containers.length} units`;
@@ -512,6 +514,93 @@
   updateClock();
   setInterval(updateClock, 1000);
 
+  // --- Hologram globe (rotates only when the server has real internet) ---
+  const globeCanvas = document.getElementById("globeCanvas");
+  const globeErr = document.getElementById("globeErr");
+  let globeRAF = null;
+  let globeT = 0;
+  let globeOnline = null;
+
+  function drawGlobe(t) {
+    const ctx = globeCanvas.getContext("2d");
+    const W = globeCanvas.width;
+    const R = 50, cx = W / 2, cy = W / 2, tilt = -0.4;
+    const ct = Math.cos(tilt), st = Math.sin(tilt);
+    ctx.clearRect(0, 0, W, W);
+    ctx.shadowColor = "rgba(255,40,56,0.7)";
+    ctx.shadowBlur = 4;
+
+    const proj = (lat, lon) => {
+      const cl = Math.cos(lat), sl = Math.sin(lat);
+      const x = R * cl * Math.sin(lon);
+      const y = R * sl;
+      const z = R * cl * Math.cos(lon);
+      return [cx + x, cy - (y * ct - z * st), y * st + z * ct];
+    };
+    const drawLine = (pts) => {
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const front = (a[2] + b[2]) / 2 >= 0;
+        ctx.strokeStyle = front ? "rgba(255,46,58,0.95)" : "rgba(255,46,58,0.22)";
+        ctx.lineWidth = front ? 1.1 : 0.7;
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      }
+    };
+
+    // outline
+    ctx.strokeStyle = "rgba(255,46,58,0.9)"; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 2 * Math.PI); ctx.stroke();
+    // parallels (static under Y-rotation)
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const phi = (lat * Math.PI) / 180, pts = [];
+      for (let d = 0; d <= 360; d += 8) pts.push(proj(phi, (d * Math.PI) / 180));
+      drawLine(pts);
+    }
+    // meridians (sweep with t -> rotation)
+    for (let k = 0; k < 6; k++) {
+      const lon = (k * Math.PI) / 6 + t, pts = [];
+      for (let d = -90; d <= 90; d += 6) pts.push(proj((d * Math.PI) / 180, lon));
+      drawLine(pts);
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function globeFrame() {
+    globeT += 0.012;
+    drawGlobe(globeT);
+    globeRAF = requestAnimationFrame(globeFrame);
+  }
+  function startGlobe() {
+    if (globeRAF || !globeCanvas) return;
+    if (globeErr) globeErr.hidden = true;
+    globeCanvas.style.visibility = "visible";
+    globeFrame();
+  }
+  function stopGlobe() {
+    if (globeRAF) { cancelAnimationFrame(globeRAF); globeRAF = null; }
+    if (globeCanvas) {
+      globeCanvas.getContext("2d").clearRect(0, 0, globeCanvas.width, globeCanvas.height);
+      globeCanvas.style.visibility = "hidden";
+    }
+    if (globeErr) globeErr.hidden = false; // ERROR glitch
+  }
+  function setOnline(on) {
+    if (on === globeOnline) return;
+    globeOnline = on;
+    if (on) startGlobe(); else stopGlobe();
+  }
+  async function checkNet() {
+    try {
+      const r = await fetch("/api/net", { cache: "no-store" });
+      const d = await r.json();
+      setOnline(!!d.online);
+    } catch {
+      setOnline(false);
+    }
+  }
+  checkNet();
+  setInterval(checkNet, 15000);
+
   // --- Dropdown menu + OS-style windows -----------------------------
   const menuBtn = document.getElementById("menuBtn");
   const menuDrop = document.getElementById("menuDrop");
@@ -521,6 +610,9 @@
   const winFoot = document.getElementById("winFoot");
   const winClose = document.getElementById("winClose");
   const winBackdrop = document.getElementById("winBackdrop");
+
+  let winTimer = null;
+  let currentWin = null;
 
   function closeMenu() {
     if (!menuDrop) return;
@@ -534,7 +626,11 @@
     if (menuBtn) menuBtn.setAttribute("aria-expanded", String(open));
   }
 
-  // Placeholder content for each sub-menu item (to be filled in later).
+  function fmtKB(kb) {
+    const mb = kb / 1024;
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : Math.round(mb) + " MB";
+  }
+
   function placeholderBody(title) {
     return `
       <div class="win-ph">
@@ -545,15 +641,80 @@
       </div>`;
   }
 
-  function openWindow(title) {
-    if (!winLayer) return;
-    winTitle.textContent = title;
+  async function renderSysmon() {
+    let s;
+    try {
+      const r = await fetch("/api/stats", { cache: "no-store" });
+      s = await r.json();
+    } catch {
+      winBody.innerHTML = `<div class="win-ph"><div class="win-ph-glyph">⚠</div><div class="win-ph-sub">нет данных</div></div>`;
+      return;
+    }
+    if (currentWin !== "sysmon") return;
+    const cpuN = s.cpu_count || 1;
+    const load1 = s.load ? s.load[0] : 0;
+    const loadPct = Math.min(100, Math.round((load1 / cpuN) * 100));
+    const mem = s.mem;
+    const memPct = mem && mem.total ? Math.round((mem.used / mem.total) * 100) : 0;
+    winBody.innerHTML = `
+      <div class="mon">
+        <div class="mon-grid">
+          <div class="mon-cell"><div class="lbl">CPU Cores</div><div class="val">${cpuN}</div></div>
+          <div class="mon-cell"><div class="lbl">Docker</div><div class="val">${s.docker ? escapeHtml(s.docker) : "—"}</div></div>
+          <div class="mon-cell"><div class="lbl">Containers</div><div class="val">${s.containers ? `${s.containers.running}/${s.containers.total}` : "—"}</div></div>
+          <div class="mon-cell"><div class="lbl">Internet</div><div class="val ${s.online ? "on" : "off"}">${s.online ? "ONLINE" : "OFFLINE"}</div></div>
+        </div>
+        <div class="mon-row">
+          <div class="mon-head"><span>CPU Load (1m)</span><b>${load1.toFixed(2)} / ${cpuN}</b></div>
+          <div class="mon-bar"><div class="mon-bar-fill" style="width:${loadPct}%"></div></div>
+        </div>
+        <div class="mon-row">
+          <div class="mon-head"><span>Memory</span><b>${mem ? `${fmtKB(mem.used)} / ${fmtKB(mem.total)} · ${memPct}%` : "—"}</b></div>
+          <div class="mon-bar"><div class="mon-bar-fill" style="width:${memPct}%"></div></div>
+        </div>
+        <div class="mon-row"><div class="mon-head"><span>Host Uptime</span><b>${s.host_uptime != null ? fmtUptime(s.host_uptime) : "—"}</b></div></div>
+        ${s.load ? `<div class="mon-row"><div class="mon-head"><span>Load Avg 1·5·15</span><b>${s.load.map((x) => x.toFixed(2)).join("   ")}</b></div></div>` : ""}
+      </div>`;
+  }
+
+  function renderNetwork() {
+    const host = window.location.hostname;
+    const cs = lastContainers;
+    const svc = cs.map((c) => {
+      const up = c.status === "running";
+      const url = buildUrl(c);
+      const ports = (c.ports || []).map((p) => `<span class="net-port">:${p}</span>`).join(" ");
+      const link = url ? `<a class="net-open" href="${escapeHtml(url)}" target="_blank" rel="noopener">OPEN ↗</a>` : "";
+      return `<div class="net-svc ${up ? "up" : ""}"><span class="ndot"></span><span class="nm">${escapeHtml(c.name)}</span>${ports} ${link}</div>`;
+    }).join("");
+    winBody.innerHTML = `
+      <div class="net">
+        <div class="net-node"><span>◈ Node</span> <span class="ip">${escapeHtml(host)}</span> <span style="margin-left:auto" class="${globeOnline ? "" : ""}">NET ${globeOnline ? "ONLINE" : "OFFLINE"}</span></div>
+        <div class="win-sect">// exposed services (${cs.length})</div>
+        ${svc || '<div class="win-ph-sub">нет сервисов</div>'}
+      </div>`;
+  }
+
+  function fillWindow(winId, title) {
+    if (winId === "sysmon") { renderSysmon(); return; }
+    if (winId === "network") { renderNetwork(); return; }
     winBody.innerHTML = placeholderBody(title);
+  }
+
+  function openWindow(winId, title) {
+    if (!winLayer) return;
+    currentWin = winId;
+    winTitle.textContent = title;
     if (winFoot) winFoot.textContent = `UBER OS // ${title}`;
     winLayer.hidden = false;
+    fillWindow(winId, title);
+    if (winTimer) { clearInterval(winTimer); winTimer = null; }
+    if (winId === "sysmon") winTimer = setInterval(() => fillWindow(winId, title), 2500);
   }
   function closeWindow() {
     if (winLayer) winLayer.hidden = true;
+    if (winTimer) { clearInterval(winTimer); winTimer = null; }
+    currentWin = null;
   }
 
   if (menuBtn) {
@@ -564,7 +725,7 @@
       const item = e.target.closest(".menu-item");
       if (!item) return;
       closeMenu();
-      openWindow(item.dataset.title || item.textContent.trim());
+      openWindow(item.dataset.win, item.dataset.title || item.textContent.trim());
     });
   }
   document.addEventListener("click", (e) => {
